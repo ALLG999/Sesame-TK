@@ -77,6 +77,9 @@ public class AntForest extends ModelTask {
         AntForestTaskTypeSet.add("GYG_diantao"); // 逛一逛点淘得红包
         AntForestTaskTypeSet.add("GYG-taote"); // 逛一逛淘宝特价版
         AntForestTaskTypeSet.add("NONGCHANG_20230818"); // 逛一逛淘宝芭芭农场
+        AntForestTaskTypeSet.add("GYG_TAOCAICAI"); // UC芭芭农场
+        AntForestTaskTypeSet.add("mokuai_senlin_hlz"); // 玩一玩
+        AntForestTaskTypeSet.add("SYH_SGBHSD202501"); // 玩一玩
     }
 
     private final AtomicInteger taskCount = new AtomicInteger(0);
