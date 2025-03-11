@@ -78,6 +78,9 @@ public class AntFarm extends ModelTask {
         bizKeyList.add("UC_gygzy");// 逛一逛UC浏览器
         bizKeyList.add("TAOBAO_renshenggyg");// 去淘宝人生逛一逛
         bizKeyList.add("TOUTIAO_daoduan");// 去今日头条极速版逛一逛
+        bizKeyList.add("CAINIAOGUOGUO2023V2");// 去菜鸟公益
+        bizKeyList.add("XJLYKBX1_s190");// 去开游戏宝箱（不确定有效性）
+        bizKeyList.add("25WFYX_guaiwulianmeng");// 去怪物联盟（不确定有效性）
         bizKeyList.add("SLEEP");// 让小鸡去睡觉
     }
     @Override
