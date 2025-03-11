@@ -21,6 +21,28 @@ import fansirsqi.xposed.sesame.util.Maps.UserMap;
 import fansirsqi.xposed.sesame.util.RandomUtil;
 import fansirsqi.xposed.sesame.data.Status;
 import fansirsqi.xposed.sesame.util.ThreadUtil;
+private static final List<String> bizKeyList;
+    static {
+        bizKeyList = new ArrayList<>();
+        bizKeyList.add("ORCHARD_NORMAL_TAOBAOQIANDAO");//逛一逛签到领现金
+        bizKeyList.add("ORCHARD_NORMAL_XINYONGKA_JIFEN");//逛一逛信用卡积分页
+        bizKeyList.add("ORCHARD_NORMAL_TOUTIAOJISU_PLUS");//逛一逛今日头条极速版
+        bizKeyList.add("ORCHARD_NORMAL_TAB3_ZHIFA");//看新闻领现金得900肥料
+        bizKeyList.add("ANTFARM_ORCHARD_NORMAL_DIANTAO_CH");//逛点淘15s得100肥料
+        bizKeyList.add("ORCHARD_NORMAL_NCLY_gly200");//逛一逛农场乐园
+        bizKeyList.add("ORCHARD_NORMAL_BAIDUDITU_DUAN");//去百度地图领现金
+        bizKeyList.add("ANTFARM_ORCHARD_NORMAL_GONGGEFANGWEN");//从支付宝首页访问农场
+        bizKeyList.add("ANTFARM_ORCHARD_NORMAL_TAO8");//逛一逛领淘宝红包
+        bizKeyList.add("ANTFARM_ORCHARD_NORMAL_HUIYUAN");//逛一逛支付宝会员
+        bizKeyList.add("ANTFARM_ORCHARD_NORMAL_MANURE_PERSON");//浏览15秒助农专场，得100肥料
+        bizKeyList.add("ORCHARD_WIDGET_FIRST_VISIT_02");//添加农场小组件并访问
+        bizKeyList.add("58298");//去淘宝最高得5000肥料
+        bizKeyList.add("ORCHARD_NORMAL_DIAOYU1");//钓鱼1次得1000肥
+        bizKeyList.add("ORCHARD_NORMAL_NCLY_NCSCC");//农场上车车开出20辆车
+        bizKeyList.add("70441");//搜一搜你心仪的宝贝
+        bizKeyList.add("45846");//浏览15秒得1500肥料，3次共4500
+      // 不会
+    }
 public class AntOrchard extends ModelTask {
   private static final String TAG = AntOrchard.class.getSimpleName();
   private String userId;
