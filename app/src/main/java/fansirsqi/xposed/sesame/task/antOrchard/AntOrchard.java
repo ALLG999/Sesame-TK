@@ -21,8 +21,9 @@ import fansirsqi.xposed.sesame.util.Maps.UserMap;
 import fansirsqi.xposed.sesame.util.RandomUtil;
 import fansirsqi.xposed.sesame.data.Status;
 import fansirsqi.xposed.sesame.util.ThreadUtil;
-private static final List<String> bizKeyList;
-    static {
+public class AntOrchard extends ModelTask {
+    private static final List<String> bizKeyList;
+     static {
         bizKeyList = new ArrayList<>();
         bizKeyList.add("ORCHARD_NORMAL_TAOBAOQIANDAO");//逛一逛签到领现金
         bizKeyList.add("ORCHARD_NORMAL_XINYONGKA_JIFEN");//逛一逛信用卡积分页
@@ -42,8 +43,7 @@ private static final List<String> bizKeyList;
         bizKeyList.add("70441");//搜一搜你心仪的宝贝
         bizKeyList.add("45846");//浏览15秒得1500肥料，3次共4500
       // 不会
-    }
-public class AntOrchard extends ModelTask {
+     }
   private static final String TAG = AntOrchard.class.getSimpleName();
   private String userId;
   private String treeLevel;
