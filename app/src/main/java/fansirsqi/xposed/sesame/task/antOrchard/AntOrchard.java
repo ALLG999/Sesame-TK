@@ -21,6 +21,7 @@ import fansirsqi.xposed.sesame.util.Maps.UserMap;
 import fansirsqi.xposed.sesame.util.RandomUtil;
 import fansirsqi.xposed.sesame.data.Status;
 import fansirsqi.xposed.sesame.util.ThreadUtil;
+  private static final String TAG = AntOrchard.class.getSimpleName();
 public class AntOrchard extends ModelTask {
     private static final List<String> bizKeyList;
      static {
@@ -44,7 +45,6 @@ public class AntOrchard extends ModelTask {
         bizKeyList.add("45846");//浏览15秒得1500肥料，3次共4500
       // 不会
      }
-  private static final String TAG = AntOrchard.class.getSimpleName();
   private String userId;
   private String treeLevel;
   private String[] wuaList;
