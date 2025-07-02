@@ -77,4 +77,13 @@ object ViewAppInfo {
                 return false
             }
         }
+
+    fun isApkInDebug2(context: Context): Boolean {
+        try {
+            val info = context.applicationInfo
+            return (info.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        } catch (_: Exception) {
+            return false
+        }
+    }
 }

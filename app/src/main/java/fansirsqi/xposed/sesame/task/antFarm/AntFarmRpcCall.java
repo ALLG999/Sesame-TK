@@ -9,6 +9,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.UUID;
 
+import fansirsqi.xposed.sesame.data.Status;
 import fansirsqi.xposed.sesame.hook.RequestManager;
 import fansirsqi.xposed.sesame.util.RandomUtil;
 
@@ -54,8 +55,8 @@ public class AntFarmRpcCall {
 
     // 一起拿小鸡饲料
     public static String letsGetChickenFeedTogether() {
-        String args1 = "[{\"needHasInviteUserByCycle\":\"true\",\"requestType\":\"RPC\",\"sceneCode\":\"ANTFARM_P2P\",\"source\":\"ANTFARM\",\"startIndex\":0," +
-                "\"version\":\"" + VERSION + "\"}]";
+        String args1 = "[{\"needHasInviteUserByCycle\":\"true\",\"requestType\":\"RPC\",\"sceneCode\":\"ANTFARM_P2P\",\"source\":\"ANTFARM\",\"startIndex\":0," + "\"version\":\"" + VERSION + "\"}]";
+        String args = "[{\"needHasInviteUserByCycle\":true,\"requestType\":\"RPC\",\"sceneCode\":\"ANTFARM_FAMILY_SHARE\",\"source\":\"ANTFARM\",\"startIndex\":0}]";
         return RequestManager.requestString("com.alipay.antiep.canInvitePersonListP2P", args1);
     }
 
@@ -236,6 +237,7 @@ public class AntFarmRpcCall {
         args.put("source", "chInfo_ch_appcenter__chsub_9patch");
         args.put("version", VERSION);
         String params = "[" + args + "]";
+
         return RequestManager.requestString("com.alipay.antfarm.feedFriendAnimal", params);
     }
 

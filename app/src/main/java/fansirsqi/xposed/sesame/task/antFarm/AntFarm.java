@@ -1598,6 +1598,9 @@ public class AntFarm extends ModelTask {
                                 }
                                 //第二次检查
                                 if (foodStock >= 180) {
+                                    if (Status.hasFlagToday("farm::feedFriendLimit")) {
+                                        return;
+                                    }
                                     JSONObject feedFriendAnimaljo = new JSONObject(AntFarmRpcCall.feedFriendAnimal(friendFarmId));
                                     if (ResChecker.checkRes(TAG, feedFriendAnimaljo)) {
                                         int feedFood = foodStock - feedFriendAnimaljo.getInt("foodStock");
@@ -1608,6 +1611,8 @@ public class AntFarm extends ModelTask {
                                         }
                                     } else {
                                         Log.error(TAG, "😞喂[" + user + "]的鸡失败" + feedFriendAnimaljo);
+                                        Status.setFlagToday("farm::feedFriendLimit");
+                                        break;
                                     }
                                 } else {
                                     Log.record(TAG, "😞喂鸡[" + user + "]饲料不足");
@@ -3051,6 +3056,10 @@ public class AntFarm extends ModelTask {
                     if (!UserMap.getUserIdSet().contains(userId)) {
                         //非好友
                         continue;
+                    }
+                    if (Status.hasFlagToday("farm::feedFriendLimit")) {
+                        Log.runtime("今日喂鸡次数已达上限🥣");
+                        return;
                     }
                     JSONObject jo = new JSONObject(AntFarmRpcCall.feedFriendAnimal(farmId, groupId));
                     if (ResChecker.checkRes(TAG, jo)) {
