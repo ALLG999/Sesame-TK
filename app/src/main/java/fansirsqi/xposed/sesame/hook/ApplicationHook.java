@@ -165,13 +165,13 @@ public class ApplicationHook implements IXposedHookLoadPackage {
     @SuppressLint("UnsafeDynamicallyLoadedCode")
     private void loadNativeLibs(Context context, File soFile) {
         try {
-            String soPath = context.getApplicationInfo().dataDir + File.separator + "lib" + File.separator + soFile.getName();
-            if (AssetUtil.INSTANCE.copyDtorageSoFileToPrivateDir(context, soFile)) {
-                System.load(soPath);
+            File finalSoFile = AssetUtil.INSTANCE.copyStorageSoFileToPrivateDir(context, soFile);
+            if (finalSoFile != null) {
+                System.load(finalSoFile.getAbsolutePath());
+                Log.runtime(TAG, "Loading " + soFile.getName() + " from :" + finalSoFile.getAbsolutePath());
             } else {
-                Detector.INSTANCE.loadLibrary("checker");
+                Detector.INSTANCE.loadLibrary(soFile.getName().replace(".so", "").replace("lib", ""));
             }
-            Log.runtime(TAG, "Loading " + soFile.getName() + " from :" + soPath);
         } catch (Exception e) {
             Log.error(TAG, "载入so库失败！！");
             Log.printStackTrace(e);
@@ -202,6 +202,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                 XposedHelpers.findAndHookMethod(Application.class, "attach", Context.class, new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                        mainHandler = new Handler(Looper.getMainLooper());
                         appContext = (Context) param.args[0];
                         PackageInfo pInfo = appContext.getPackageManager().getPackageInfo(appContext.getPackageName(), 0);
                         assert pInfo.versionName != null;
@@ -278,7 +279,6 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                         new XC_MethodHook() {
                             @Override
                             protected void afterHookedMethod(MethodHookParam param) {
-                                mainHandler = new Handler(Looper.getMainLooper());
                                 Service appService = (Service) param.thisObject;
                                 if (!General.CURRENT_USING_SERVICE.equals(appService.getClass().getCanonicalName())) {
                                     return;
@@ -311,7 +311,6 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                                         long currentTime = System.currentTimeMillis();
                                         if (lastExecTime + 2000 > currentTime) {
                                             Log.record(TAG, "执行间隔较短，跳过执行");
-                                            execDelayedHandler(BaseModel.getCheckInterval().getValue());
                                             return;
                                         }
                                         String currentUid = UserMap.getCurrentUid();
