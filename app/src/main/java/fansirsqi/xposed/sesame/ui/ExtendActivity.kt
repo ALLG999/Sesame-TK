@@ -13,6 +13,7 @@ import fansirsqi.xposed.sesame.R
 import fansirsqi.xposed.sesame.data.DataCache
 import fansirsqi.xposed.sesame.entity.ExtendFunctionItem
 import fansirsqi.xposed.sesame.ui.widget.ExtendFunctionAdapter
+import fansirsqi.xposed.sesame.util.Detector.getApiUrl
 import fansirsqi.xposed.sesame.util.FansirsqiUtil
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.ToastUtil
