@@ -61,7 +61,7 @@ object AssetUtil {
      * 从应用安装目录复制so库到模块私有目录
      *
      * @param context 上下文
-     * @param destFile  目标so库文件
+     * @param soName  so库名称
      * @return 复制是否成功
      */
     fun copySoFileToStorage(context: Context, destFile: File): Boolean {
@@ -69,7 +69,6 @@ object AssetUtil {
             Files.ensureDir(File(destDir))
             val appInfo = context.applicationInfo
             val sourceDir = appInfo.nativeLibraryDir + File.separator + destFile.name
-//            Log.error(TAG, "Copying SO file from $sourceDir to ${destFile.absolutePath}")
             if (destFile.exists() && compareMD5(sourceDir, destFile.absolutePath)) {
                 Log.runtime(TAG, "SO file already exists: " + destFile.absolutePath)
                 return true
@@ -96,19 +95,15 @@ object AssetUtil {
         }
     }
 
-    /**
-     * 从模块私有目录复制so库到应用安装目录
-     * @param context 上下文
-     * @param sourceFile  源so库文件
-     * @return 复制是否成功
-     */
-    fun copyStorageSoFileToPrivateDir(context: Context, sourceFile: File): File? {
+    //拷贝上面释放的文件到context 私有lib目录
+    fun copyDtorageSoFileToPrivateDir(context: Context, sourceFile: File): Boolean {
         try {
             if (!sourceFile.exists()) {
                 Log.error(TAG, "SO file not exists: " + sourceFile.absolutePath)
-                return null
+                return false
             }
-            val targetDir = context.getDir("sesame_libs", Context.MODE_PRIVATE)
+            val targetDir = context.applicationInfo.dataDir + File.separator + "lib"
+            Files.ensureDir(File(targetDir))
             val targetFile = File(targetDir, sourceFile.name)
             if (targetFile.exists() && compareMD5(
                     sourceFile.absolutePath,
@@ -116,7 +111,7 @@ object AssetUtil {
                 )
             ) {
                 Log.runtime(TAG, "SO file already exists: " + targetFile.absolutePath)
-                return targetFile
+                return true
             }
             FileInputStream(sourceFile).use { fis ->
                 FileOutputStream(targetFile).use { fos ->
@@ -131,13 +126,14 @@ object AssetUtil {
                         "Copied ${sourceFile.name} from ${sourceFile.absolutePath} to ${targetFile.absolutePath}"
                     )
                     setExecutablePermissions(targetFile)
-                    return targetFile
+                    return true
                 }
             }
         } catch (e: Exception) {
             Log.error(TAG, "Failed to copy ${sourceFile.name} of storage: ${e.message}")
-            return null
+            return false
         }
+
     }
 
 
