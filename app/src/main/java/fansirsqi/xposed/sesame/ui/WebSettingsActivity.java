@@ -97,7 +97,7 @@ public class WebSettingsActivity extends BaseActivity {
         if (intent != null) {
             userId = intent.getStringExtra("userId");
             userName = intent.getStringExtra("userName");
-            intent.getBooleanExtra("debug", ViewAppInfo.INSTANCE.isApkInDebug());
+            intent.getBooleanExtra("debug", BuildConfig.DEBUG);
         }
         Model.initAllModel();
         UserMap.setCurrentUserId(userId);
@@ -184,7 +184,7 @@ public class WebSettingsActivity extends BaseActivity {
                 return false;
             }
         });
-        if (ViewAppInfo.INSTANCE.isApkInDebug()) {
+        if (BuildConfig.DEBUG) {
             WebView.setWebContentsDebuggingEnabled(true);
 //            webView.loadUrl("http://192.168.31.69:5500/app/src/main/assets/web/index.html");
             webView.loadUrl("file:///android_asset/web/index.html");
@@ -229,7 +229,7 @@ public class WebSettingsActivity extends BaseActivity {
         @JavascriptInterface
         public String getTabs() {
             String result = JsonUtil.formatJson(tabList, false);
-            if (ViewAppInfo.INSTANCE.isApkInDebug()) {
+            if (BuildConfig.DEBUG) {
                 Log.runtime(TAG,"WebSettingsActivity.getTabs: " + result);
             }
             return result;
@@ -243,7 +243,7 @@ public class WebSettingsActivity extends BaseActivity {
         @JavascriptInterface
         public String getGroup() {
             String result = JsonUtil.formatJson(groupList, false);
-            if (ViewAppInfo.INSTANCE.isApkInDebug()) {
+            if (BuildConfig.DEBUG) {
                 Log.runtime(TAG,"WebSettingsActivity.getGroup: " + result);
             }
             return result;
@@ -261,7 +261,7 @@ public class WebSettingsActivity extends BaseActivity {
                 modelDtoList.add(new ModelDto(modelConfig.getCode(), modelConfig.getName(), modelConfig.getIcon(), groupCode, modelFields));
             }
             String result = JsonUtil.formatJson(modelDtoList, false);
-            if (ViewAppInfo.INSTANCE.isApkInDebug()) {
+            if (BuildConfig.DEBUG) {
                 Log.runtime(TAG,"WebSettingsActivity.getModelByGroup: " + result);
             }
             return result;
@@ -301,7 +301,7 @@ public class WebSettingsActivity extends BaseActivity {
                     list.add(ModelFieldShowDto.toShowDto(modelField));
                 }
                 String result = JsonUtil.formatJson(list, false);
-                if (ViewAppInfo.INSTANCE.isApkInDebug()) {
+                if (BuildConfig.DEBUG) {
                     Log.runtime(TAG,"WebSettingsActivity.getModel: " + result);
                 }
                 return result;
@@ -348,7 +348,7 @@ public class WebSettingsActivity extends BaseActivity {
                 ModelField<?> modelField = modelConfig.getModelField(fieldCode);
                 if (modelField != null) {
                     String result = JsonUtil.formatJson(ModelFieldInfoDto.toInfoDto(modelField), false);
-                    if (ViewAppInfo.INSTANCE.isApkInDebug()) {
+                    if (BuildConfig.DEBUG) {
                         Log.runtime(TAG,"WebSettingsActivity.getField: " + result);
                     }
                     return result;

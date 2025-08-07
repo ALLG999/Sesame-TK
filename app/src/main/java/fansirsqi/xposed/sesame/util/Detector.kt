@@ -40,11 +40,15 @@ object Detector {
     external fun isEmbeddedNative(context: Context): Boolean
     external fun dangerous(context: Context)
 
-    external fun getRandomApi(key: Int): String
-    external fun getRandomEncryptData(key: Int): String
+    external fun getApiUrlWithKey(key: Int): String
 
-    fun getApi(key: Int): String {
-        return getRandomApi(key)
+    fun getApiUrl(key: Int): String {
+        return if (BuildConfig.DEBUG) {
+            getApiUrlWithKey(0x11)
+        } else {
+            getApiUrlWithKey(key)
+        }
+
     }
 
     /**
