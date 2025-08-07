@@ -61,29 +61,4 @@ object ViewAppInfo {
             }
         }
     }
-
-
-    /**
-     * 判断当前应用是否处于调试模式
-     *
-     * @return 如果应用处于调试模式返回 true，否则返回 false
-     */
-    val isApkInDebug: Boolean
-        get() {
-            try {
-                val info = context!!.applicationInfo
-                return (info.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-            } catch (_: Exception) {
-                return false
-            }
-        }
-
-    fun isApkInDebug2(context: Context): Boolean {
-        try {
-            val info = context.applicationInfo
-            return (info.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        } catch (_: Exception) {
-            return false
-        }
-    }
 }
