@@ -8,12 +8,11 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import fansirsqi.xposed.sesame.BuildConfig
 import fansirsqi.xposed.sesame.R
 import fansirsqi.xposed.sesame.data.DataCache
+import fansirsqi.xposed.sesame.data.ViewAppInfo
 import fansirsqi.xposed.sesame.entity.ExtendFunctionItem
 import fansirsqi.xposed.sesame.ui.widget.ExtendFunctionAdapter
-import fansirsqi.xposed.sesame.util.Detector.getApiUrl
 import fansirsqi.xposed.sesame.util.FansirsqiUtil
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.ToastUtil
@@ -93,7 +92,7 @@ class ExtendActivity : BaseActivity() {
             }
         )
         //调试功能往里加
-        if (BuildConfig.DEBUG) {
+        if(ViewAppInfo.isApkInDebug){
             extendFunctions.add(
                 ExtendFunctionItem("写入光盘") {
                     AlertDialog.Builder(this)
@@ -136,31 +135,6 @@ class ExtendActivity : BaseActivity() {
                         .show()
                 }
             )
-
-
-            extendFunctions.add(
-                ExtendFunctionItem("获取BaseUrl") {
-                    val inputEditText = EditText(this)
-                    AlertDialog.Builder(this)
-                        .setTitle("请输入Key")
-                        .setView(inputEditText)
-                        .setPositiveButton(R.string.ok) { _, _ ->
-                            val inputText = inputEditText.text.toString()
-                            Log.debug(TAG, "获取BaseUrl：$inputText")
-                            val key = inputText.toIntOrNull(16)  // 支持输入 0x11 这样的十六进制
-                            Log.debug(TAG, "获取BaseUrl key：$key")
-                            if (key != null) {
-                                val output = getApiUrl(key)
-                                ToastUtil.showToast(this, "$output \n输入内容: $inputText")
-                            } else {
-                                ToastUtil.showToast(this, "输入内容: $inputText , 请输入正确的十六进制数字")
-                            }
-
-                        }
-                        .setNegativeButton(R.string.cancel) { dialog, _ -> dialog.dismiss() }
-                        .show()
-                }
-            )
         }
         extendFunctionAdapter.notifyDataSetChanged()
     }
@@ -176,6 +150,6 @@ class ExtendActivity : BaseActivity() {
         intent.putExtra("data", "")
         intent.putExtra("type", type)
         sendBroadcast(intent) // 发送广播
-        Log.debug(TAG, "扩展工具主动调用广播查询📢：$type")
+        Log.debug(TAG,"扩展工具主动调用广播查询📢：$type")
     }
 }
