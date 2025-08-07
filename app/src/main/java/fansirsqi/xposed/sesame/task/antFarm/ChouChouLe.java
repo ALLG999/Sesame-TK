@@ -83,7 +83,7 @@ public class ChouChouLe {
                             doubleCheck = true;
                         }
                     } else if (TaskStatus.TODO.name().equals(task.taskStatus)) {
-                        if (task.getRemainingTimes() > 0) {
+                        if (task.getRemainingTimes() > 0 && !"DONATION".equals(task.innerAction))  {
                             if (doChouTask(drawType, task)) {
                                 doubleCheck = true;
                             }
