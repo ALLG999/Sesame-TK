@@ -9,36 +9,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. 设置时区为中国上海
+      - name: Set Timezone to Asia/Shanghai
         run: |
           sudo timedatectl set-timezone Asia/Shanghai
           echo "Current time: $(date)"
 
-      - name: 2. 检出代码
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: 3. 设置 Java 环境（JDK 17 + Zulu）
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: "zulu"
           cache: gradle
 
-      - name: 4. 设置 Gradle 环境（使用 wrapper）
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: false
           gradle-version: wrapper
 
-      - name: 5. 授权执行 gradlew
+      - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: 6. 执行构建（构建 Normal 和 Compatible 两种 APK。）
+      - name: Build with Gradle
         run: ./gradlew assembleNormalRelease assembleCompatibleRelease -Pversion=${{ github.ref_name }}
 
-      - name: 7. 找到 APK 输出路径
+      - name: Locate APKs and Set Outputs
         id: locate_apks
         run: |
           normal_apk=$(find app/build/outputs/apk/normal/release -name "*.apk" | head -n 1)
@@ -46,13 +46,13 @@ jobs:
           echo "normal_apk=$normal_apk" >> $GITHUB_OUTPUT
           echo "compatible_apk=$compatible_apk" >> $GITHUB_OUTPUT
 
-      - name: 8. 拷贝 APK 到统一目录，准备签名
+      - name: Copy APKs to staging for signing
         run: |
           mkdir -p app/build/outputs/apk/all
           cp "${{ steps.locate_apks.outputs.normal_apk }}" app/build/outputs/apk/all/
           cp "${{ steps.locate_apks.outputs.compatible_apk }}" app/build/outputs/apk/all/
 
-      - name: 9. 签名 APK
+      - name: Sign APKs
         id: sign_apks
         uses: ilharp/sign-android-release@v2
         with:
@@ -63,7 +63,7 @@ jobs:
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
           buildToolsVersion: 36.0.0
 
-      - name: 10. 提取签名后 APK 的路径
+      - name: Extract Signed APK Paths
         id: extract_apks
         run: |
           IFS=':' read -r -a files <<< "${{ steps.sign_apks.outputs.signedFiles }}"
@@ -75,19 +75,19 @@ jobs:
             fi
           done
 
-      - name: 11. 上传 APK 产物 - Compatible
+      - name: Upload APK - Compatible
         uses: actions/upload-artifact@v4
         with:
           name: apk-compatible
           path: ${{ steps.extract_apks.outputs.signed_compatible }}
 
-      - name: 11. 上传 APK 产物 - Normal
+      - name: Upload APK - Normal
         uses: actions/upload-artifact@v4
         with:
           name: apk-normal
           path: ${{ steps.extract_apks.outputs.signed_normal }}
 
-      - name: 12. 提取文件名和版本号
+      - name: Extract file names
         id: extract_info
         run: |
           normal_file=$(basename "${{ steps.extract_apks.outputs.signed_normal }}")
@@ -98,40 +98,12 @@ jobs:
           echo "compatible_file=$compatible_file" >> $GITHUB_OUTPUT
           echo "version=$version" >> $GITHUB_OUTPUT
 
-      - name: 13. 生成 SHA256 校验文件
+      - name: Generate APKS Checksum
         run: |
           sha256sum ${{ steps.extract_apks.outputs.signed_normal }} > CHECKSUMS-Sesame-Normal-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}-signed.apk.sha256
           sha256sum ${{ steps.extract_apks.outputs.signed_compatible }} > CHECKSUMS-Sesame-Compatible-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}-signed.apk.sha256
 
-      - name: 14. 获取 Git 提交信息
-        id: commit_details
-        run: |
-          COMMIT_MESSAGE_BODY=$( \
-            if [[ "${{ github.event_name }}" == "push" ]]; then \
-              echo "🔨 $(git rev-list --count ${{ github.event.before }}..${{ github.event.after }}) new commits to ${{ github.repository }}:${{ github.ref_name }} ([compare view](https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.event.after }}))"; \
-              echo ""; \
-              git log --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an" ${{ github.event.before }}..${{ github.event.after }}; \
-            elif [[ "${{ github.event_name }}" == "pull_request" ]]; then \
-              echo "📦 Pull Request #${{ github.event.number }} for ${{ github.repository }}: ${{ github.head_ref }} -> ${{ github.base_ref }} ([view PR](https://github.com/${{ github.repository }}/pull/${{ github.event.number }}))"; \
-              echo ""; \
-              echo "Commits:"; \
-              git log --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}; \
-            elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then \
-              echo "⚙️ Manual workflow run on ${{ github.ref_name }} by ${{ github.actor }}"; \
-              echo ""; \
-              echo "Latest commit:"; \
-              git log -1 --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an"; \
-            else \
-              echo "ℹ️ Commit information for ${{ github.event_name }} event on ${{ github.ref_name }} by ${{ github.actor }}:"; \
-              echo ""; \
-              git log -1 --format="  %h ([view commit](https://github.com/${{ github.repository }}/commit/%H)): %s by %an"; \
-            fi \
-          )
-          echo "COMMIT_MESSAGE_BODY<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMIT_MESSAGE_BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: 15. 自动打标签（例如 v2.5.8）
+      - name: Create Tag from Version
         if: startsWith(github.ref, 'refs/heads/main') && github.event_name == 'push'
         run: |
           VERSION_TAG="v${{ steps.extract_info.outputs.version }}"
@@ -139,7 +111,7 @@ jobs:
           git tag "$VERSION_TAG"
           git push origin "$VERSION_TAG"
 
-      - name: 16. 推送 Telegram 通知（分 2 次发 APK）
+      - name: Post to channel
         if: github.ref == 'refs/heads/main'
         env:
           CHANNEL_ID: ${{ secrets.TG_CHAT_ID }}
@@ -149,15 +121,17 @@ jobs:
           COMMIT_MESSAGE: |+
             New push to github\!
             ```
-            ${{ steps.commit_details.outputs.COMMIT_MESSAGE_BODY }}
+            ${{ github.event.head_commit.message }}
             ```by `${{ github.event.head_commit.author.name }}`
             See commit detail [here](${{ github.event.head_commit.url }})
         run: |
-          ESCAPED=`python3 -c 'import json,os,urllib.parse; print(urllib.parse.quote(json.dumps(os.environ["COMMIT_MESSAGE"])))'`
-          curl -v "https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup?chat_id=${CHANNEL_ID}&media=%5B%7B%22type%22:%22document%22,%20%22media%22:%22attach://release%22,%22parse_mode%22:%22MarkdownV2%22,%22caption%22:${ESCAPED}%7D%5D"  -F release="@$NORMAL_FILE"
-          curl -v "https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup?chat_id=${CHANNEL_ID}&media=%5B%7B%22type%22:%22document%22,%20%22media%22:%22attach://release%22,%22parse_mode%22:%22MarkdownV2%22,%22caption%22:${ESCAPED}%7D%5D"  -F release="@$COMPATIBLE_FILE"
+          ESCAPED=$(python3 -c 'import json, os, urllib.parse; print(urllib.parse.quote(json.dumps(os.environ["COMMIT_MESSAGE"])))')
+          curl -v "https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup?chat_id=${CHANNEL_ID}&media=%5B%7B%22type%22:%22document%22,%20%22media%22:%22attach://normal.apk%22,%22parse_mode%22:%22MarkdownV2%22,%22caption%22:${ESCAPED}%7D,%20%7B%22type%22:%22document%22,%22media%22:%22attach://compatible.apk%22%7D%5D" \
+            -F "normal.apk=@${NORMAL_FILE}" \
+            -F "compatible.apk=@${COMPATIBLE_FILE}"
+      
 
-      - name: 17. 发布到 GitHub Release
+      - name: Upload Assets to Source Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.event.release.tag_name || steps.extract_info.outputs.version }} # 发布的名称。默认为标签名称
