@@ -664,45 +664,7 @@ public class AntFarm extends ModelTask {
     /**
      * 自动喂鸡
      */
-    private void handleAutoFeedAnimal() {
-        if (!AnimalInteractStatus.HOME.name().equals(ownerAnimal.animalInteractStatus)) {
-            return; // 小鸡不在家，不执行喂养逻辑
-        }
-        boolean needReload = false;
-        // 1. 判断是否需要喂食
-        if (AnimalFeedStatus.HUNGRY.name().equals(ownerAnimal.animalFeedStatus)) {
-            if (feedAnimal.getValue()) {
-                Log.record("小鸡在挨饿~Tk 尝试为你自动喂食");
-                if (feedAnimal(ownerFarmId)) {
-                    needReload = true;
-                }
-            }
-        }
-
-        // 2. 判断是否需要使用加速道具
-        if (useAccelerateTool.getValue() && !AnimalFeedStatus.HUNGRY.name().equals(ownerAnimal.animalFeedStatus)) {
-            if (useAccelerateTool()) {
-                needReload = true;
-            }
-        }
-
-        // 3. 如果有操作导致状态变化，则刷新庄园信息
-        if (needReload) {
-            enterFarm();
-            syncAnimalStatus(ownerFarmId);
-        }
-
-        // 4. 计算并安排下一次自动喂食任务
-        try {
-            Long startEatTime = ownerAnimal.startEatTime;
-            double allFoodHaveEatten = 0d;
-            double allConsumeSpeed = 0d;
-
-            for (Animal animal : animals) {
-                allFoodHaveEatten += animal.foodHaveEatten;
-                allConsumeSpeed += animal.consumeSpeed;
-            }
-private void handleAutoFeedAnimal() {
+	private void handleAutoFeedAnimal() {
         if (!AnimalInteractStatus.HOME.name().equals(ownerAnimal.animalInteractStatus)) {
             return; // 小鸡不在家，不执行喂养逻辑
         }
@@ -779,7 +741,7 @@ private void handleAutoFeedAnimal() {
             receiveFarmAwards();
         }
     }
-
+	
     private void animalSleepNow() {
         try {
             String s = AntFarmRpcCall.queryLoveCabin(UserMap.getCurrentUid());
