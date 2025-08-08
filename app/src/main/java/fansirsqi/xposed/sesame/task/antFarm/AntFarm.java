@@ -702,6 +702,56 @@ public class AntFarm extends ModelTask {
                 allFoodHaveEatten += animal.foodHaveEatten;
                 allConsumeSpeed += animal.consumeSpeed;
             }
+private void handleAutoFeedAnimal() {
+        if (!AnimalInteractStatus.HOME.name().equals(ownerAnimal.animalInteractStatus)) {
+            return; // 小鸡不在家，不执行喂养逻辑
+        }
+        boolean needReload = false;
+        // 1. 判断是否需要喂食
+        if (AnimalFeedStatus.HUNGRY.name().equals(ownerAnimal.animalFeedStatus)) {
+            if (feedAnimal.getValue()) {
+                Log.record("小鸡在挨饿~Tk 尝试为你自动喂食");
+                if (feedAnimal(ownerFarmId)) {
+                    needReload = true;
+                }
+            }
+        }
+		
+	// 2. 使用加饭卡（仅当正在吃饭且开启配置）
+        if (useBigEaterTool.getValue() && AnimalFeedStatus.EATING.name().equals(ownerAnimal.animalFeedStatus)) {
+            boolean result = useFarmTool(ownerFarmId, AntFarm.ToolType.BIG_EATER_TOOL);
+            if (result) {
+                Log.farm("使用道具🎭[加饭卡]！");
+                GlobalThreadPools.sleep(1000);
+                needReload = true;
+            } else {
+                Log.record("⚠️使用道具🎭[加饭卡]失败，可能卡片不足或状态异常~");
+            }
+        }
+
+        // 3. 判断是否需要使用加速道具
+        if (useAccelerateTool.getValue() && !AnimalFeedStatus.HUNGRY.name().equals(ownerAnimal.animalFeedStatus)) {
+            if (useAccelerateTool()) {
+                needReload = true;
+            }
+        }
+
+        // 4. 如果有操作导致状态变化，则刷新庄园信息
+        if (needReload) {
+            enterFarm();
+            syncAnimalStatus(ownerFarmId);
+        }
+
+        // 5. 计算并安排下一次自动喂食任务
+        try {
+            Long startEatTime = ownerAnimal.startEatTime;
+            double allFoodHaveEatten = 0d;
+            double allConsumeSpeed = 0d;
+
+            for (Animal animal : animals) {
+                allFoodHaveEatten += animal.foodHaveEatten;
+                allConsumeSpeed += animal.consumeSpeed;
+            }
 
             if (allConsumeSpeed > 0) {
                 long nextFeedTime = startEatTime + (long) ((180 - allFoodHaveEatten) / allConsumeSpeed) * 1000;
@@ -719,7 +769,7 @@ public class AntFarm extends ModelTask {
             Log.printStackTrace(e);
         }
 
-        // 5. 其他功能（换装、领取饲料）
+        // 6. 其他功能（换装、领取饲料）
         // 小鸡换装
         if (listOrnaments.getValue() && Status.canOrnamentToday()) {
             listOrnaments();
@@ -729,7 +779,6 @@ public class AntFarm extends ModelTask {
             receiveFarmAwards();
         }
     }
-
 
     private void animalSleepNow() {
         try {
