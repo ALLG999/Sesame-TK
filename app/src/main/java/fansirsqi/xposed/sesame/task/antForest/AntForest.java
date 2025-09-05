@@ -1142,7 +1142,7 @@ public class AntForest extends ModelTask {
                     return;
                 } else {
                     if (obj.optBoolean("canCollectEnergy")) {
-                        long canCollectLaterTime = obj.getLong("canCollectLaterTime");
+                        long canCollectLaterTime = obj.optLong("canCollectLaterTime", -1);
                         if (canCollectLaterTime > 0 && canCollectLaterTime - System.currentTimeMillis() < checkIntervalInt) {//如果收取时间在执行时间范围内，则可以收取
                             canCollect = true;
                         }
@@ -1164,7 +1164,7 @@ public class AntForest extends ModelTask {
                 boolean canCollect = false;
                 if (needCollectEnergy) {
                     if (obj.optBoolean("canCollectEnergy")) {
-                        long canCollectLaterTime = obj.getLong("canCollectLaterTime");
+                        long canCollectLaterTime = obj.optLong("canCollectLaterTime", -1);
                         if (canCollectLaterTime > 0 && canCollectLaterTime - System.currentTimeMillis() < checkIntervalInt) {//如果收取时间在执行时间范围内，则可以收取
                             canCollect = true;
                         }
