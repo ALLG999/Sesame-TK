@@ -68,6 +68,7 @@ import fansirsqi.xposed.sesame.util.RandomUtil;
 import fansirsqi.xposed.sesame.util.ResChecker;
 import fansirsqi.xposed.sesame.util.TimeUtil;
 import fansirsqi.xposed.sesame.util.TimeFormatter;
+import fansirsqi.xposed.sesame.data.ProtectedFriendsCache;
 import lombok.Getter;
 /// lzw add begin
 import fansirsqi.xposed.sesame.model.modelFieldExt.PriorityModelField;
@@ -178,6 +179,8 @@ public class AntForest extends ModelTask {
     private ChoiceModelField robExpandCard;//1.1倍能量卡
     private ListModelField robExpandCardTime; //1.1倍能量卡时间
     private IntegerModelField cycleinterval;      // 循环间隔
+    private BooleanModelField EnergyTimer;         // 能量球蹲点定时
+    private IntegerModelField takeLookLogCount; // 找能量日志打印次数
 
 
     /**
@@ -203,6 +206,18 @@ public class AntForest extends ModelTask {
      * Key: 用户ID，Value: 跳过原因（如"baohuzhao"表示有保护罩）
      */
     private final Map<String, String> skipUsersCache = new ConcurrentHashMap<>();
+    
+    /**
+     * 保护罩好友缓存管理器
+     * -- GETTER --
+     *  获取保护罩好友缓存管理器（用于外部访问）
+     *
+     * @return 保护罩缓存管理器实例
+
+     */
+    @Getter
+    private ProtectedFriendsCache protectedFriendsCache;
+    
     /**
      * 加速器定时
      */
@@ -218,6 +233,11 @@ public class AntForest extends ModelTask {
 
     @Getter
     private Set<String> dsontCollectMap = new HashSet<>();
+
+    public BooleanModelField getEnergyTimer() {
+        return EnergyTimer;
+    }
+
     ArrayList<String> emojiList = new ArrayList<>(Arrays.asList(
             "🍅", "🍓", "🥓", "🍂", "🍚", "🌰", "🟢", "🌴",
             "🥗", "🧀", "🥩", "🍍", "🌶️", "🍲", "🍆", "🥕",
@@ -268,6 +288,7 @@ public class AntForest extends ModelTask {
         modelFields.addField(collectEnergy = new PriorityModelField("collectEnergy", "收集能量 | 开关", priorityType.CLOSE, priorityType.nickNames));
         modelFields.addField(batchRobEnergy = new BooleanModelField("batchRobEnergy", "一键收取 | 开关", false));
         modelFields.addField(pkEnergy = new BooleanModelField("pkEnergy", "Pk榜收取 | 开关", false));
+        modelFields.addField(EnergyTimer = new BooleanModelField("EnergyTimer", "能量球蹲点定时 | 开关", false));
         modelFields.addField(closeWhackMole = new BooleanModelField("closeWhackMole", "自动关闭6秒拼手速 | 开关", false));
         modelFields.addField(energyRain = new BooleanModelField("energyRain", "能量雨 | 开关", false));
         modelFields.addField(dontCollectList = new SelectModelField("dontCollectList", "不收能量 | 配置列表", new LinkedHashSet<>(), AlipayUser::getList));
@@ -340,7 +361,10 @@ public class AntForest extends ModelTask {
         modelFields.addField(tryCount = new IntegerModelField("tryCount", "尝试收取(次数)", 1, 0, 5));
         modelFields.addField(retryInterval = new IntegerModelField("retryInterval", "重试间隔(毫秒)", 1200, 0, 10000));
         modelFields.addField(cycleinterval = new IntegerModelField("cycleinterval", "循环间隔(毫秒)", 5000, 0, 10000));
+        modelFields.addField(takeLookLogCount = new IntegerModelField("takeLookLogCount", "找能量日志打印次数", 2, 0, 100));
         modelFields.addField(showBagList = new BooleanModelField("showBagList", "显示背包内容", false));
+
+
         return modelFields;
     }
 
@@ -466,6 +490,8 @@ public class AntForest extends ModelTask {
                 doubleCollectInterval.getValue(), 10, 5000, "双击间隔");
         delayTimeMath.clear();
         
+        // 初始化保护罩好友缓存
+        protectedFriendsCache = ProtectedFriendsCache.INSTANCE;
         
         AntForestRpcCall.init();
     }
@@ -505,6 +531,14 @@ public class AntForest extends ModelTask {
             // -------------------------------
             usePropBeforeCollectEnergy(selfId);
             tc.countDebug("使用自己道具卡");
+            
+            // -------------------------------
+            // 检查保护罩到期收取
+            // -------------------------------
+            if (EnergyTimer.getValue()) {
+                GlobalThreadPools.execute(this::collectMaturedBubbles);
+                tc.countDebug("检查能量球到期收取（异步）");
+            }
 
             // -------------------------------
             // 收PK好友能量
@@ -660,6 +694,20 @@ public class AntForest extends ModelTask {
             skipUsersCache.clear();
             // 清空好友主页缓存
             String str_totalCollected = "本次总 收:" + totalCollected + "g 帮:" + totalHelpCollected + "g 浇:" + totalWatered + "g";
+            // 显示保护罩缓存统计信息
+            if (protectedFriendsCache != null) {
+                try {
+                    String cacheStats = protectedFriendsCache.getCacheStats();
+                    Log.record(TAG, cacheStats);
+                    // 如果开启了能量球蹲点定时功能，安排下次定时收取
+                    if (EnergyTimer.getValue()) {
+                        scheduleNextBubbleStakeout();
+                    }
+                } catch (Exception e) {
+                    Log.printStackTrace(TAG, "获取能量球缓存统计失败", e);
+                }
+            }
+            
             Notify.updateLastExecText(str_totalCollected);
         }
     }
@@ -1024,15 +1072,12 @@ public class AntForest extends ModelTask {
                 Log.error(TAG, "获取自己主页信息失败：响应为空"+response);
                 return null;
             }
-            
             userHomeObj = new JSONObject(response);
-            
             // 检查响应是否成功
             if (!ResChecker.checkRes(TAG + "查询自己主页失败:", userHomeObj)) {
                 Log.error(TAG, "查询自己主页失败: " + userHomeObj.optString("resultDesc", "未知错误"));
                 return null;
             }
-            
             updateSelfHomePage(userHomeObj);
             long end = System.currentTimeMillis();
             // 安全获取服务器时间，如果没有则使用当前时间
@@ -1134,48 +1179,56 @@ public class AntForest extends ModelTask {
     private JSONObject collectEnergy(String userId, JSONObject userHomeObj, String fromTag) {
         try {
             // 1. 检查接口返回是否成功
-             if (!ResChecker.checkRes(TAG + "载入用户主页失败:", userHomeObj)) {
-                 Log.debug(TAG, "载入失败: " + userHomeObj.optString("resultDesc", "未知错误"));
-                 return userHomeObj;
-             }
-             long serverTime = userHomeObj.optLong("now", System.currentTimeMillis());
+            if (!ResChecker.checkRes(TAG + "载入用户主页失败:", userHomeObj)) {
+                Log.debug(TAG, "载入失败: " + userHomeObj.optString("resultDesc", "未知错误"));
+                return userHomeObj;
+            }
+            long serverTime = userHomeObj.optLong("now", System.currentTimeMillis());
             boolean isSelf = Objects.equals(userId, selfId);
 
             if (cacheCollectedMap.containsKey(userId)) {
                 return userHomeObj;
             }
             String userName = getAndCacheUserName(userId, userHomeObj, fromTag);
-            String bizType = "GREEN";
+
+            // 2. 优先检查保护罩，此逻辑对所有好友类型（普通、PK等）都适用
+            if (!isSelf) {
+                boolean hasShieldProtection = hasShield(userHomeObj, serverTime);
+                boolean hasBombProtection = hasBombCard(userHomeObj, serverTime);
+                if (hasShieldProtection || hasBombProtection) {
+                    String protectionType = hasShieldProtection ? "保护罩" : "炸弹卡";
+                    String emoji = hasShieldProtection ? "❤️" : "💣";
+                    addToSkipUsers(userId);
+                    Log.record(TAG, "[" + userName + "](" + fromTag + ") 有" + protectionType + emoji + "，本轮将跳过");
+                    return userHomeObj; // 有保护罩，直接返回，不再检查能量球
+                }
+            }
 
             // 3. 判断是否允许收取能量
             if ((collectEnergy.getValue() <= 0) || dsontCollectMap.contains(userId)) {
                 Log.debug(TAG, "[" + userName + "] 不允许收取能量，跳过");
                 return userHomeObj;
             }
-            // 4. 获取所有可收集的能量球
+
+            // 4. 获取所有能量球信息（可收取和待收取）
             List<Long> availableBubbles = new ArrayList<>();
-            extractBubbleInfo(userHomeObj, serverTime, availableBubbles, userId);
-            // 如果没有任何能量球（可收），则标记为空林并直接返回
-            if (availableBubbles.isEmpty()) {
+            boolean hasAnyBubble = extractBubbleInfo(userHomeObj, serverTime, availableBubbles, userId);
+
+            // 5. 如果没有任何能量球（可收或待收），则标记为空林并直接返回
+            if (!hasAnyBubble) {
                 emptyForestCache.put(userId, System.currentTimeMillis());
                 return userHomeObj;
             }
-            // 检查是否有能量罩保护（影响当前收取）
-            boolean hasProtection = false;
-            if (!isSelf) {
-                if (hasShield(userHomeObj, serverTime)) {
-                    hasProtection = true;
-                    Log.record(TAG, "[" + userName + "]被能量罩❤️保护着哟，跳过收取");
-                }
-                if (hasBombCard(userHomeObj, serverTime)) {
-                    hasProtection = true;
-                    Log.record(TAG, "[" + userName + "]开着炸弹卡💣，跳过收取");
-                }
+            
+            // 6. 如果只有待收的能量球，直接返回 (因为已经加入蹲点列表)
+            if (availableBubbles.isEmpty()) {
+                return userHomeObj;
             }
-            // 7. 只有没有保护时才收集当前可用能量
-            if (!hasProtection) {
-                collectVivaEnergy(userId, userHomeObj, availableBubbles, bizType, fromTag);
-            }
+
+            // 7. 此时已确定没有保护罩且有可收能量球，执行收取
+            String bizType = "GREEN";
+            collectVivaEnergy(userId, userHomeObj, availableBubbles, bizType, fromTag);
+
             return userHomeObj;
         } catch (JSONException | NullPointerException e) {
             Log.printStackTrace(TAG, "collectUserEnergy JSON解析错误", e);
@@ -1189,31 +1242,44 @@ public class AntForest extends ModelTask {
 
 
     /**
-     * 提取能量球状态
+     * 提取能量球状态，将可收取的加入列表，将待成熟的加入蹲点缓存
      *
      * @param userHomeObj      用户主页的JSON对象
      * @param serverTime       服务器时间
-     * @param availableBubbles 可收集的能量球ID列表
+     * @param availableBubbles [输出] 可收集的能量球ID列表
      * @param userId          用户ID
+     * @return 是否有任何能量球（无论是可收取还是待成熟）
      * @throws JSONException JSON解析异常
      */
-
-    private void extractBubbleInfo(JSONObject userHomeObj, long serverTime, List<Long> availableBubbles, String userId) throws JSONException {
-        if (!userHomeObj.has("bubbles")) return;
+    private boolean extractBubbleInfo(JSONObject userHomeObj, long serverTime, List<Long> availableBubbles, String userId) throws JSONException {
+        if (!userHomeObj.has("bubbles")) return false;
         JSONArray jaBubbles = userHomeObj.getJSONArray("bubbles");
-        if (jaBubbles.length() == 0) return;
-        
+        if (jaBubbles.length() == 0) return false;
+
+        boolean hasWaiting = false;
+
         for (int i = 0; i < jaBubbles.length(); i++) {
             JSONObject bubble = jaBubbles.getJSONObject(i);
             long bubbleId = bubble.getLong("id");
             String statusStr = bubble.getString("collectStatus");
             CollectStatus status = CollectStatus.valueOf(statusStr);
-            
-            // 只收集可收取的能量球，跳过等待成熟的
+
             if (status == CollectStatus.AVAILABLE) {
                 availableBubbles.add(bubbleId);
+            } else if (status == CollectStatus.WAITING) {
+                hasWaiting = true;
+                long produceTime = bubble.getLong("produceTime");
+                // 如果开启了蹲点功能，将所有待成熟的能量球加入缓存
+                if (EnergyTimer.getValue() && produceTime > serverTime) {
+                    String userName = getAndCacheUserName(userId, userHomeObj, null);
+                    if (protectedFriendsCache != null) {
+                        protectedFriendsCache.addStakeout(userId, userName, bubbleId, produceTime);
+                    }
+                }
             }
         }
+
+        return !availableBubbles.isEmpty() || hasWaiting;
     }
 
 
@@ -1280,7 +1346,7 @@ public class AntForest extends ModelTask {
                 return;
             }
             List<String> idList = new ArrayList<>();
-            int batchSize = 30;
+            int batchSize = 20;
             int remainingSize = totalDatas.length() - 20;
             int batches = (remainingSize + batchSize - 1) / batchSize;
             CountDownLatch latch = new CountDownLatch(batches);
@@ -1329,14 +1395,19 @@ public class AntForest extends ModelTask {
      */
     private void collectEnergyByTakeLook() {
         try {
+
             TimeCounter tc = new TimeCounter(TAG);
+
             int foundCount = 0;
             int maxAttempts = 10; // 减少到10次，避免过度循环
             int consecutiveEmpty = 0; // 连续空结果计数
+            int protectionLogCount = 0; // 发现保护罩日志计数器
+            int emptyLogCount = 0;      // 未发现好友日志计数器
+            int failedQueryLogCount = 0; // 查询失败日志计数器
+            int maxLogCount = takeLookLogCount.getValue();  //日志打印次数
             Log.record(TAG, "开始使用找能量功能收取好友能量");
-            for (int attempt = 1; attempt <= maxAttempts; attempt ++) {
-                // 构建跳过用户列表（有保护罩的用户）
-                JSONObject skipUsers = buildSkipUsersMap();
+            JSONObject skipUsers = new JSONObject();
+            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
                 // 调用找能量接口
                 String takeLookResponse = AntForestRpcCall.takeLook(skipUsers);
                 JSONObject takeLookResult = new JSONObject(takeLookResponse);
@@ -1347,70 +1418,56 @@ public class AntForest extends ModelTask {
                 // 获取找到的好友ID
                 String friendId = takeLookResult.optString("friendId");
                 if (friendId.isEmpty() || Objects.equals(friendId, selfId)) {
-                    Log.record(TAG, "第" + attempt + "次找能量没有发现新好友，继续尝试:"+skipUsers);
+                    if (emptyLogCount < maxLogCount) {
+                        Log.record(TAG, "找能量没有发现新好友，继续尝试:" + skipUsers);
+                        emptyLogCount++;
+                    }
                     continue;
                 }
-                  // 查询好友主页并收取能量
-                  JSONObject friendHomeObj = queryFriendHome(friendId, "TAKE_LOOK_FRIEND");
-                  if (friendHomeObj != null) {
+                // 查询好友主页并收取能量
+                JSONObject friendHomeObj = queryFriendHome(friendId, "TAKE_LOOK_FRIEND");
+                if (friendHomeObj != null) {
                     foundCount++;
-                    String friendName = UserMap.getMaskName(friendId);
-                    if (friendName == null || friendName.isEmpty() || friendName.equals(friendId)) {
-                        // 如果UserMap没有返回有效的用户名，使用通用的获取用户名方法
-                        friendName = getAndCacheUserName(friendId,friendHomeObj,null);
+                    String friendName = getAndCacheUserName(friendId, friendHomeObj, null);
+                    long currentTime = System.currentTimeMillis();
+                    // 检查是否有保护，如果有则添加到跳过列表
+                    boolean hasShieldProtection = hasShield(friendHomeObj, currentTime);
+                    boolean hasBombProtection = hasBombCard(friendHomeObj, currentTime);
+
+                    if (hasShieldProtection || hasBombProtection) {
+                        String protectionType = hasShieldProtection ? "保护罩" : "炸弹卡";
+                        addToSkipUsers(friendId);
+                        if (protectionLogCount < maxLogCount) {
+                            Log.record(TAG, "找能量发现好友[" + friendName + "]有" + protectionType + "，跳过收取");
+                            protectionLogCount++;
+                        }
+                    } else {
+                        // 没有保护才进行收取处理
+                        collectEnergy(friendId, friendHomeObj, "takeLook");
                     }
-                      long currentTime = System.currentTimeMillis();
-                      // 检查是否有保护，如果有则添加到跳过列表
-                      boolean hasShieldProtection = hasShield(friendHomeObj, currentTime);
-                      boolean hasBombProtection = hasBombCard(friendHomeObj, currentTime);
-                      if (hasShieldProtection || hasBombProtection) {
-                          String protectionType = hasShieldProtection ? "保护罩" : "炸弹卡";
-                          addToSkipUsers(friendId);
-                          Log.record(TAG, "找能量第" + attempt + "次发现好友[" + friendName + "]有" + protectionType + "，跳过收取");
-                      } else {
-                          // 没有保护才进行收取处理
-                          collectEnergy(friendId, friendHomeObj, "takeLook");
-                      }
-                      // 优化间隔：找到好友时减少等待时间，提高效率
+                    // 优化间隔：找到好友时减少等待时间，提高效率
                     GlobalThreadPools.sleep(1500L);
                     consecutiveEmpty = 0; // 重置连续空结果计数
                 } else {
                     consecutiveEmpty++;
                     // 检查friendId是否为null或空，给出更详细的信息
-                      Log.record(TAG, "找能量第" + attempt + "次：发现好友但是自己，跳过");
-                      // 连续2次空结果就提前结束，避免浪费时间
-                    if (consecutiveEmpty >= 2) {
+                    if (failedQueryLogCount < maxLogCount) {
+                        Log.record(TAG, "找能量：发现好友但查询失败，跳过");
+                        failedQueryLogCount++;
+                    }
+                    // 连续多次空结果就提前结束，避免浪费时间
+                    if (consecutiveEmpty >= maxLogCount) {
                         Log.record(TAG, "连续" + consecutiveEmpty + "次无结果，提前结束找能量");
                         break;
                     }
                 }
             }
             tc.countDebug("找能量收取完成");
-            Log.record(TAG, "找能量功能完成，共发现 " + foundCount + " 个好友");
+            Log.record(TAG, "找能量功能完成，共发现 " + foundCount + " 个好友"+skipUsers);
         } catch (Exception e) {
             Log.error(TAG, "找能量过程中发生异常");
             Log.printStackTrace(TAG, "collectEnergyByTakeLook 异常", e);
         }
-    }
-    
-    /**
-     * 构建跳过用户映射表
-     * @return 包含需要跳过用户的JSON对象
-     */
-    private JSONObject buildSkipUsersMap() {
-        JSONObject skipUsers = new JSONObject();
-        try {
-            // 从缓存中获取有保护罩的用户列表
-            for (Map.Entry<String, String> entry : skipUsersCache.entrySet()) {
-                String userId = entry.getKey();
-                String reason = entry.getValue();
-                skipUsers.put(userId, reason);
-            }
-            skipUsers.length();
-        } catch (Exception e) {
-            Log.printStackTrace(TAG, "构建跳过用户列表失败", e);
-        }
-        return skipUsers;
     }
     
     /**
@@ -1424,6 +1481,58 @@ public class AntForest extends ModelTask {
         } catch (Exception e) {
             Log.printStackTrace(TAG, "添加跳过用户失败", e);
         }
+    }
+
+    /**
+     * 获取保护罩结束时间
+     * @param userHomeObj 用户主页对象
+     * @param serverTime 服务器时间
+     * @return 保护罩结束时间戳，如果没有保护罩返回0
+     */
+    private long getShieldEndTime(JSONObject userHomeObj, long serverTime) {
+        return getPropEndTime(userHomeObj, "shield", serverTime);
+    }
+    
+    /**
+     * 获取炸弹卡结束时间
+     * @param userHomeObj 用户主页对象
+     * @param serverTime 服务器时间
+     * @return 炸弹卡结束时间戳，如果没有炸弹卡返回0
+     */
+    private long getBombCardEndTime(JSONObject userHomeObj, long serverTime) {
+        return getPropEndTime(userHomeObj, "energyBombCard", serverTime);
+    }
+    
+    /**
+     * 获取指定道具组的结束时间
+     * @param userHomeObj 用户主页对象
+     * @param propGroup 道具组名称
+     * @param serverTime 服务器时间
+     * @return 道具结束时间戳，如果没有对应道具返回0
+     */
+    private long getPropEndTime(JSONObject userHomeObj, String propGroup, long serverTime) {
+        try {
+            JSONArray props = userHomeObj.optJSONArray("usingUserProps");
+            if (props == null) {
+                props = userHomeObj.optJSONArray("usingUserPropsNew");
+            }
+            if (props == null) {
+                return 0;
+            }
+            
+            for (int i = 0; i < props.length(); i++) {
+                JSONObject prop = props.optJSONObject(i);
+                if (prop != null && propGroup.equals(prop.optString("propGroup"))) {
+                    long endTime = prop.optLong("endTime", 0);
+                    if (endTime > serverTime) {
+                        return endTime;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.printStackTrace(TAG, "获取道具结束时间失败", e);
+        }
+        return 0;
     }
 
     private void collectFriendEnergy() {
@@ -2964,7 +3073,7 @@ public class AntForest extends ModelTask {
     /**
      * 使用双击卡道具
      * 功能：提高能量收取效率，可以进行双击收取
-     * 
+     *
      * @param bagObject 背包的JSON对象
      */
     private void useDoubleCard(JSONObject bagObject) {
@@ -2986,7 +3095,7 @@ public class AntForest extends ModelTask {
     /**
      * 使用隐身卡道具
      * 功能：隐藏收取行为，避免被好友发现偷取能量
-     * 
+     *
      * @param bagObject 背包的JSON对象
      */
     private void useStealthCard(JSONObject bagObject) {
@@ -3313,6 +3422,124 @@ public class AntForest extends ModelTask {
         }
         
         return userName;
+    }
+    
+    /**
+     * 安排下一次能量球成熟收取任务
+     */
+    private void scheduleNextBubbleStakeout() {
+        try {
+            if (protectedFriendsCache == null) {
+                return;
+            }
+            
+            long nextMaturityTime = protectedFriendsCache.getNextMaturityTime();
+            if (nextMaturityTime <= 0) {
+                Log.runtime(TAG, "没有能量球需要定时蹲点");
+                return;
+            }
+            
+            // 任务安排在能量球成熟的那一分钟执行
+            // 例如: 16:51:32成熟，任务安排在16:51:00触发
+            long currentTime = System.currentTimeMillis();
+            
+            if (nextMaturityTime <= currentTime) {
+                Log.runtime(TAG, "能量球即将成熟，立即安排收取任务");
+                // 如果时间已经过了，立即执行异步收取
+                GlobalThreadPools.execute(this::collectMaturedBubbles);
+                return;
+            }
+            
+            // 格式化为 HHmm 格式
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTimeInMillis(nextMaturityTime);
+            int hour = calendar.get(Calendar.HOUR_OF_DAY);
+            int minute = calendar.get(Calendar.MINUTE);
+            @SuppressLint("DefaultLocale") String timeStr = String.format("%02d%02d", hour, minute);
+            
+            // 获取当前定时列表
+            java.util.List<String> currentTimes = new java.util.ArrayList<>(BaseModel.getExecAtTimeList().getValue());
+            // 如果时间点不存在，则添加
+            if (!currentTimes.contains(timeStr)) {
+                currentTimes.add(timeStr);
+                // 排序时间列表
+                currentTimes.sort(String::compareTo);
+                // 【BUG修复】将修改后的列表写回配置，使之生效
+                BaseModel.getExecAtTimeList().setValue(currentTimes);
+                Log.record(TAG, "已安排能量球蹲点收取任务: " + timeStr + " (" + TimeUtil.getCommonDate(nextMaturityTime) + ")");
+                // 显示即将到期的好友信息
+                java.util.List<ProtectedFriendsCache.StakeoutInfo> soonMaturingBubbles =
+                    protectedFriendsCache.getSoonMaturingBubbles(60); // 1小时内到期的
+                for (ProtectedFriendsCache.StakeoutInfo stakeout : soonMaturingBubbles) {
+                    long remainingTime = stakeout.getMaturityTime() - currentTime;
+                    String remainingTimeStr = TimeFormatter.formatTimeDifference(remainingTime);
+                    Log.record(TAG, "蹲点能量球: [" + stakeout.getUserName() + "] 成熟时间: " + TimeUtil.getCommonDate(stakeout.getMaturityTime()) + ", 剩余: " + remainingTimeStr);
+                }
+            }
+            
+        } catch (Exception e) {
+            Log.printStackTrace(TAG, "安排能量球蹲点收取失败", e);
+        }
+    }
+    
+    /**
+     * 收取已成熟的能量球
+     * 专门用于定时收取刚刚成熟的能量球
+     */
+    private void collectMaturedBubbles() {
+        try {
+            if (protectedFriendsCache == null) {
+                return;
+            }
+            Log.record(TAG, "开始检查即将成熟的能量球（精确蹲点）");
+            // 获取未来2分钟内即将成熟的能量球
+            java.util.List<ProtectedFriendsCache.StakeoutInfo> soonMaturingBubbles = protectedFriendsCache.getSoonMaturingBubbles(2);
+            if (soonMaturingBubbles.isEmpty()) {
+                Log.record(TAG, "未来2分钟内没有即将成熟的能量球");
+                return;
+            }
+
+            // 按用户分组，为每个用户启动一个统一的收取任务
+            Map<String, java.util.List<ProtectedFriendsCache.StakeoutInfo>> userBubblesMap = new LinkedHashMap<>();
+            for (ProtectedFriendsCache.StakeoutInfo info : soonMaturingBubbles) {
+                userBubblesMap.computeIfAbsent(info.getUserId(), k -> new ArrayList<>()).add(info);
+            }
+            Log.record(TAG, "发现 " + userBubblesMap.size() + " 个好友的能量球即将在2分钟内成熟，启动精确蹲点...");
+            for (Map.Entry<String, java.util.List<ProtectedFriendsCache.StakeoutInfo>> entry : userBubblesMap.entrySet()) {
+                String userId = entry.getKey();
+                java.util.List<ProtectedFriendsCache.StakeoutInfo> userBubbles = entry.getValue();
+                if (userBubbles.isEmpty()) continue;
+
+                String userName = userBubbles.get(0).getUserName();
+                long earliestTime = userBubbles.stream().mapToLong(ProtectedFriendsCache.StakeoutInfo::getMaturityTime).min().orElse(0);
+
+                GlobalThreadPools.execute(() -> {
+                    try {
+                        long delay = earliestTime - System.currentTimeMillis() + 1500; // 增加1.5秒缓冲
+                        if (delay > 0) {
+                            Log.record(TAG, "蹲点好友[" + userName + "]，等待 " + delay + "ms 后收取...");
+                            Thread.sleep(delay);
+                        }
+                        Log.forest("好友[" + userName + "]的首个能量球已成熟，开始批量收取！");
+                        
+                        // 在收取前，移除该用户所有的蹲点记录。收取后会自动重新添加未成熟的。
+                        if (protectedFriendsCache != null) {
+                            protectedFriendsCache.removeAllStakeoutsForUser(userId);
+                        }
+                        
+                        // 查询好友主页并收取
+                        JSONObject friendHomeObj = queryFriendHome(userId, "STAKEOUT_BUBBLE");
+                        if (friendHomeObj != null) {
+                            collectEnergy(userId, friendHomeObj, "stakeoutBubble");
+                        }
+                    } catch (Exception e) {
+                        Log.printStackTrace(TAG, "精确蹲点收取好友能量失败: " + userName, e);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.printStackTrace(TAG, "精确蹲点任务启动失败", e);
+        }
     }
 }
 

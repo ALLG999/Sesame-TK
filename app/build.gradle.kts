@@ -164,6 +164,9 @@ android {
         }
     }
     val cmakeFile = file("src/main/cpp/CMakeLists.txt")
+    kotlinOptions {
+        freeCompilerArgs = listOf("-XXLanguage:+PropertyParamAnnotationDefaultTargetMode")
+    }
     if (!isCIBuild && cmakeFile.exists()) {
         externalNativeBuild {
             cmake {
