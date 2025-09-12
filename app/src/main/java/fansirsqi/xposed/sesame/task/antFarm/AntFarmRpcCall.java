@@ -48,8 +48,8 @@ public class AntFarmRpcCall {
         args.put("userId", userId);
         args.put("userToken", "");
         args.put("version", VERSION);
-        String paras = "[" + args + "]";
-        return RequestManager.requestString("com.alipay.antfarm.enterFarm", paras);
+        String pamras = "[" + args + "]";
+        return RequestManager.requestString("com.alipay.antfarm.enterFarm", pamras);
     }
 
 

@@ -154,7 +154,6 @@ public class HtmlViewerActivity extends BaseActivity {
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onResume() {
         super.onResume();
@@ -207,7 +206,7 @@ public class HtmlViewerActivity extends BaseActivity {
                                         mWebView.evaluateJavascript("setFullText(" + jsArg + ")", null);
 
                                         // 然后启动增量监听（你在 MyWebView 里实现的）
-                                        if (mWebView != null) {
+                                        if (mWebView instanceof MyWebView) {
                                             ((MyWebView) mWebView).startWatchingIncremental(path);
                                             // 或者 ((MyWebView) mWebView).startWatchingWithObserver(path);
                                         }

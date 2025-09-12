@@ -530,7 +530,7 @@ public class Files {
      */
     public static boolean copy(File source, File dest) {
         try (FileInputStream fileInputStream = new FileInputStream(source);
-             FileOutputStream fileOutputStream = new FileOutputStream(createFile(dest), false);
+             FileOutputStream fileOutputStream = new FileOutputStream(createFile(dest));
              FileChannel inputChannel = fileInputStream.getChannel();
              FileChannel outputChannel = fileOutputStream.getChannel()) {
             outputChannel.transferFrom(inputChannel, 0, inputChannel.size());

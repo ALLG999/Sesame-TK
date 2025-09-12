@@ -54,9 +54,9 @@ public class AntForestRpcCall {
             arg.put("rankType", "energyRank");
             arg.put("version", VERSION);
             String param = "[" + arg + "]";
-            JSONObject correlationLocal = new JSONObject();
-            correlationLocal.put("pathList", new JSONArray().put("friendRanking").put("myself").put("totalDatas"));
-            String relationLocal = "[" + correlationLocal + "]";
+            JSONObject jorelationLocal = new JSONObject();
+            jorelationLocal.put("pathList", new JSONArray().put("friendRanking").put("myself").put("totalDatas"));
+            String relationLocal = "[" + jorelationLocal + "]";
             return RequestManager.requestString("alipay.antmember.forest.h5.queryEnergyRanking", param, relationLocal);
         } catch (Exception e) {
             return "";
@@ -450,8 +450,8 @@ public class AntForestRpcCall {
     public static String consumeProp2(String propGroup, String propId, String propType) throws JSONException {
         JSONObject requestData = createConsumePropRequestData(propGroup, propId, propType, null);
         return RequestManager.requestString(
-           "alipay.antforest.forest.h5.consumeProp",
-                      "["+requestData+"]"
+                "alipay.antforest.forest.h5.consumeProp",
+                new JSONArray().put(requestData).toString()
         );
     }
 
@@ -944,24 +944,24 @@ public class AntForestRpcCall {
     }
 
     /**
- * 根据道具类型获取道具组
- * @param propType 道具类型
- * @return 道具组
- */
-public static String getPropGroup(String propType) {
-    if (propType.contains("SHIELD")) {
-        return "shield";
-    } else if (propType.contains("DOUBLE_CLICK")) {
-        return "doubleClick";
-    } else if (propType.contains("STEALTH")) {
-        return "stealthCard";
-    } else if (propType.contains("BOMB_CARD") || propType.contains("NO_EXPIRE")) {
-        return "energyBombCard";
-    } else if (propType.contains("ROB_EXPAND")) {
-        return "robExpandCard";
-    } else if (propType.contains("BUBBLE_BOOST")) {
-        return "boost";
+     * 根据道具类型获取道具组
+     * @param propType 道具类型
+     * @return 道具组
+     */
+    public static String getPropGroup(String propType) {
+        if (propType.contains("SHIELD")) {
+            return "shield";
+        } else if (propType.contains("DOUBLE_CLICK")) {
+            return "doubleClick";
+        } else if (propType.contains("STEALTH")) {
+            return "stealthCard";
+        } else if (propType.contains("BOMB_CARD")) {
+            return "energyBombCard";
+        } else if (propType.contains("ROB_EXPAND")) {
+            return "robExpandCard";
+        } else if (propType.contains("BUBBLE_BOOST")) {
+            return "bubbleBoostCard";
+        }
+        return ""; // 默认返回空字符串
     }
-    return ""; // 默认返回空字符串
-}
 }

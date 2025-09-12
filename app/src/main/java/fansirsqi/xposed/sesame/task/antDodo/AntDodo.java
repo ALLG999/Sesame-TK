@@ -101,14 +101,14 @@ public class AntDodo extends ModelTask {
      * 神奇物种
      */
     private boolean lastDay(String endDate) {
-        long timeStep = System.currentTimeMillis();
-        long endTimeStep = TimeUtil.timeToStamp(endDate);
-        return timeStep < endTimeStep && (endTimeStep - timeStep) < 86400000L;
+        long timeStemp = System.currentTimeMillis();
+        long endTimeStemp = TimeUtil.timeToStamp(endDate);
+        return timeStemp < endTimeStemp && (endTimeStemp - timeStemp) < 86400000L;
     }
     public boolean in8Days(String endDate) {
-        long timeStep = System.currentTimeMillis();
-        long endTimeStep = TimeUtil.timeToStamp(endDate);
-        return timeStep < endTimeStep && (endTimeStep - timeStep) < 691200000L;
+        long timeStemp = System.currentTimeMillis();
+        long endTimeStemp = TimeUtil.timeToStamp(endDate);
+        return timeStemp < endTimeStemp && (endTimeStemp - timeStemp) < 691200000L;
     }
     private void collect() {
         try {

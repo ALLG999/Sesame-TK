@@ -1,6 +1,5 @@
 package fansirsqi.xposed.sesame.model.modelFieldExt;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.view.Gravity;
@@ -51,7 +50,6 @@ public class ListModelField extends ModelField<List<String>> {
      * @param context 上下文环境
      * @return 返回一个按钮视图，用于触发编辑功能
      */
-    @SuppressLint("UseCompatLoadingForDrawables")
     @Override
     public View getView(Context context) {
         Button btn = new Button(context);

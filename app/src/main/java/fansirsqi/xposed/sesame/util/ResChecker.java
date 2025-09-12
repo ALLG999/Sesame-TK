@@ -1,7 +1,5 @@
 package fansirsqi.xposed.sesame.util;
 
-import androidx.annotation.NonNull;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -32,43 +30,39 @@ public class ResChecker {
                 return true;
             }
 
-            // 特殊情况：如果是“人数过多”的系统错误，我们认为这不是一个需要记录的“失败”
-            String resultDesc = jo.optString("resultDesc", "");
-            if (resultDesc.contains("当前参与人数过多") || resultDesc.contains("请稍后再试")) {
-                return false; // 返回false，但不打印错误日志
-            }
             // 获取调用栈信息以确定错误来源
             StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-            String callerInfo = getString(stackTrace);
+            String callerInfo = "";
+
+            // 寻找第一个非ResChecker类且非Java系统类的调用者（真正的业务代码调用位置）
+            for (int i = 0; i < stackTrace.length; i++) {
+                StackTraceElement element = stackTrace[i];
+                String className = element.getClassName();
+
+                // 跳过ResChecker类和Java系统类
+                if (!className.contains("ResChecker") &&
+                        !className.startsWith("java.lang.") &&
+                        !className.startsWith("java.util.") &&
+                        className.contains("fansirsqi.xposed.sesame")) {
+
+                    // 获取简化的类名（不含包名）
+                    String simpleClassName = className.substring(className.lastIndexOf('.') + 1);
+                    callerInfo = simpleClassName + "." + element.getMethodName() + ":" + element.getLineNumber();
+                    break;
+                }
+            }
+
+            if (callerInfo.isEmpty()) {
+                callerInfo = "未知来源";
+            }
+
             Log.error(TAG, "Check failed: [来源: " + callerInfo + "] " + jo);
             return false;
+
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "Error checking JSON success:", t);
             return false;
         }
-    }
-
-    @NonNull
-    private static String getString(StackTraceElement[] stackTrace) {
-        String callerInfo = "";
-        // 寻找第一个非ResChecker类且非Java系统类的调用者（真正的业务代码调用位置）
-        for (StackTraceElement element : stackTrace) {
-            String className = element.getClassName();
-            // 跳过ResChecker类和Java系统类
-            if (!className.contains("ResChecker") &&
-                    !className.startsWith("java.lang.") &&
-                    !className.startsWith("java.util.") &&
-                    className.contains("fansirsqi.xposed.sesame")) {
-                // 获取简化的类名（不含包名）
-                String simpleClassName = className.substring(className.lastIndexOf('.') + 1);
-                callerInfo = simpleClassName + "." + element.getMethodName() + ":" + element.getLineNumber();
-                break;
-            }
-        }
-        if (callerInfo.isEmpty()) {
-            callerInfo = "未知来源";
-        }
-        return callerInfo;
     }
 
     /**
