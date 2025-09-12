@@ -64,6 +64,8 @@ import fansirsqi.xposed.sesame.hook.rpc.debug.DebugRpc;
 import fi.iki.elonen.NanoHTTPD;
 import kotlin.jvm.JvmStatic;
 import lombok.Getter;
+import fansirsqi.xposed.sesame.task.antForest.AntForest;
+import fansirsqi.xposed.sesame.data.ProtectedFriendsCache;
 
 public class ApplicationHook implements IXposedHookLoadPackage {
     static final String TAG = ApplicationHook.class.getSimpleName();
@@ -510,9 +512,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                         Calendar wakenAtTimeCalendar = TimeUtil.getTodayCalendarByTimeStr(wakenAtTime);
                         if (wakenAtTimeCalendar != null && wakenAtTimeCalendar.compareTo(nowCalendar) > 0) {
                             if (alarmScheduler != null) {
-                                if (alarmScheduler.scheduleWakeupAlarm(wakenAtTimeCalendar.getTimeInMillis(), i, false)) {
-                                    Log.record(TAG, "⏰ 设置定时唤醒: " + wakenAtTime);
-                                }
+                                alarmScheduler.scheduleWakeupAlarm(wakenAtTimeCalendar.getTimeInMillis(), i, false);// Log.record(TAG, "⏰ 设置定时唤醒: " + wakenAtTime);
                             } else {
                                 Log.error(TAG, "AlarmScheduler未初始化，无法设置定时唤醒");
                             }
@@ -642,6 +642,27 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                 String successMsg = "芝麻粒-TK 加载成功✨";
                 Log.record(successMsg);
                 Toast.show(successMsg);
+                try {
+                    AntForest antForest = Model.getModel(AntForest.class);
+                    if (antForest != null && antForest.getEnergyTimer() != null && antForest.getEnergyTimer().getValue()) {
+                        ProtectedFriendsCache cache = antForest.getProtectedFriendsCache();
+                        if (cache != null) {
+                            java.util.Set<ProtectedFriendsCache.StakeoutInfo> stakeoutFriends = cache.getAllStakeouts();
+                            if (!stakeoutFriends.isEmpty()) {
+                                Log.record(TAG, "--- 能量球蹲点任务时间表 ---");
+                                java.util.List<ProtectedFriendsCache.StakeoutInfo> sortedFriends = new java.util.ArrayList<>(stakeoutFriends);
+                                sortedFriends.sort(java.util.Comparator.comparingLong(ProtectedFriendsCache.StakeoutInfo::getMaturityTime));
+                                for (ProtectedFriendsCache.StakeoutInfo friend : sortedFriends) {
+                                    long maturityTime = friend.getMaturityTime();
+                                    Log.record(TAG, "  - " + friend.getUserName() + ": " + TimeUtil.getCommonDate(maturityTime));
+                                }
+                                Log.record(TAG, "--------------------");
+                            }
+                        }
+                    }
+                } catch (Throwable t) {
+                    Log.printStackTrace(TAG, "打印定时任务时间表时出错", t);
+                }
             }
             offline = false;
             execHandler();

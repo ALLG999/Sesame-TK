@@ -178,9 +178,6 @@ public class AlarmScheduler {
                     "Sesame:AlarmWakeLock:" + requestCode
                 );
                 wakeLock.acquire(5000); // 持有5秒钟以确保闹钟设置成功
-                Log.record(TAG, String.format("已设置多重保护闹钟: ID=%d, 预定时间=%s", 
-                    requestCode, TimeUtil.getTimeStr(triggerAtMillis)));
-                
                 // 保存闹钟引用
                 scheduledAlarms.put(requestCode, pendingIntent);
                 return true;

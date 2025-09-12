@@ -10,7 +10,7 @@ import java.net.URL
 
 object FansirsqiUtil {
     // 定义一言API的URL
-    private const val HITOKOTO_API_URL = "https://v1.hitokoto.cn/"
+    private const val HIROHITO_API_URL = "https://international.v1.hitokoto.cn/"
 
     /**
      * 获取一言（挂起函数），推荐在协程中使用
@@ -18,7 +18,7 @@ object FansirsqiUtil {
      */
     suspend fun getOneWord(): String = withContext(Dispatchers.IO) {
         return@withContext try {
-            val connection = URL(HITOKOTO_API_URL).openConnection() as HttpURLConnection
+            val connection = URL(HIROHITO_API_URL).openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
