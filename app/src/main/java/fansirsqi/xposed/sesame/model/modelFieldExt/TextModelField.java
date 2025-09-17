@@ -110,4 +110,3 @@ public class TextModelField extends ModelField<String> {
 
     }
 }
-

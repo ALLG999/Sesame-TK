@@ -61,7 +61,7 @@ public class BaseModel extends Model {
      */
     @Getter
     public static final ListModelField.ListJoinCommaToStringModelField energyTime =
-            new ListModelField.ListJoinCommaToStringModelField("energyTime", "只收能量时间(范围|关闭:-1)", ListUtil.newArrayList("0700-0730"));
+            new ListModelField.ListJoinCommaToStringModelField("energyTime", "只收能量时间(范围|关闭:-1)", ListUtil.newArrayList("0655-0731"));
 
     /**
      * 模块休眠时间范围
