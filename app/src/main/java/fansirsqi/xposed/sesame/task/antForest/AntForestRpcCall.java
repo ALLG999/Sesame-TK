@@ -1,5 +1,7 @@
 package fansirsqi.xposed.sesame.task.antForest;
 
+import static fansirsqi.xposed.sesame.task.antForest.AntForest.TAG;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -11,40 +13,94 @@ import fansirsqi.xposed.sesame.entity.AlipayVersion;
 import fansirsqi.xposed.sesame.entity.RpcEntity;
 import fansirsqi.xposed.sesame.hook.ApplicationHook;
 import fansirsqi.xposed.sesame.hook.RequestManager;
+import fansirsqi.xposed.sesame.util.Log;
 import fansirsqi.xposed.sesame.util.RandomUtil;
-import fansirsqi.xposed.sesame.util.StringUtil;
 
 /**
  * 森林 RPC 调用类
  */
 public class AntForestRpcCall {
-    private static String VERSION = "";
+    private static String VERSION = "20250813";
 
     public static void init() {
         AlipayVersion alipayVersion = ApplicationHook.getAlipayVersion();
-        if (alipayVersion.compareTo(new AlipayVersion("10.5.88.8000")) > 0) {
-            VERSION = "20240403";
-        } else if (alipayVersion.compareTo(new AlipayVersion("10.3.96.8100")) > 0) {
-            VERSION = "20230501";
-        } else {
-            VERSION = "20230501";
+        Log.record("AntForestRpcCall", "当前支付宝版本: " + alipayVersion.toString());
+        try {
+            switch (alipayVersion.getVersionString()) {
+                case "10.7.30.8000":
+                    VERSION = "20250813";  // 2025年版本
+                    break;
+                case "10.5.88.8000":
+                    VERSION = "20240403";  // 2024年版本
+                    break;
+                case "10.3.96.8100":
+                    VERSION = "20230501";  // 2023年版本
+                    break;
+                default:
+                    VERSION = "20250813";
+            }
+            Log.record("AntForestRpcCall", "使用API版本: " + VERSION);
+        } catch (Exception e) {
+            Log.error("AntForestRpcCall", "版本初始化异常，使用默认版本: " + VERSION);
+            Log.printStackTrace(e);
         }
     }
 
-    private static String getUniqueId() {
-        return String.valueOf(System.currentTimeMillis()) + RandomUtil.nextLong();
+    public static String queryFriendsEnergyRanking() {
+        try {
+            JSONObject arg = new JSONObject();
+            arg.put("source", "chInfo_ch_appcenter__chsub_9patch");
+            arg.put("periodType", "total");
+            arg.put("rankType", "energyRank");
+            arg.put("version", VERSION);
+            String param = "[" + arg + "]";
+            JSONObject jorelationLocal = new JSONObject();
+            jorelationLocal.put("pathList", new JSONArray().put("friendRanking").put("myself").put("totalDatas"));
+            String relationLocal = "[" + jorelationLocal + "]";
+            return RequestManager.requestString("alipay.antmember.forest.h5.queryEnergyRanking", param, relationLocal);
+        } catch (Exception e) {
+            return "";
+        }
     }
 
-    public static String queryEnergyRanking() {
-        return RequestManager.requestString(
-                "alipay.antmember.forest.h5.queryEnergyRanking",
-                "[{\"periodType\":\"total\",\"rankType\":\"energyRank\",\"source\":\"chInfo_ch_appcenter__chsub_9patch\",\"version\":\"" + VERSION + "\"}]",
-                "{\"pathList\":[\"friendRanking\",\"myself\",\"totalDatas\"]}");
+    public static String queryTopEnergyChallengeRanking() {
+        try {
+            JSONObject arg = new JSONObject();
+            arg.put("source", "chInfo_ch_appcenter__chsub_9patch");
+            String param = "[" + arg + "]";
+            return RequestManager.requestString("alipay.antforest.forest.h5.queryTopEnergyChallengeRanking", param);
+        } catch (Exception e) {
+            Log.printStackTrace(e);
+            return "";
+        }
     }
 
-    public static String fillUserRobFlag(String userIdList) {
-        return RequestManager.requestString("alipay.antforest.forest.h5.fillUserRobFlag", "[{\"userIdList\":" + userIdList + "}]", "{\"pathList" +
-                "\":[\"friendRanking\"]}");
+    public static String fillUserRobFlag(JSONArray userIdList) {
+        try {
+            JSONObject arg = new JSONObject();
+            arg.put("source", "chInfo_ch_appcenter__chsub_9patch");
+            arg.put("userIdList", userIdList);
+            String param = "[" + arg + "]";
+            JSONObject joRelationLocal = new JSONObject();
+            joRelationLocal.put("pathList", new JSONArray().put("friendRanking"));
+            String relationLocal = "[" + joRelationLocal + "]";
+            return RequestManager.requestString("alipay.antforest.forest.h5.fillUserRobFlag", param, relationLocal);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    public static String fillUserRobFlag(JSONArray userIdList, boolean needFillUserInfo) {
+        try {
+            JSONObject arg = new JSONObject();
+            arg.put("source", "chInfo_ch_appcenter__chsub_9patch");
+            arg.put("userIdList", userIdList);
+            arg.put("needFillUserInfo", needFillUserInfo);
+            String param = "[" + arg + "]";
+            return RequestManager.requestString("alipay.antforest.forest.h5.fillUserRobFlag", param);
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     public static String queryHomePage() throws JSONException {
@@ -62,72 +118,101 @@ public class AntForestRpcCall {
         );
     }
 
-    public static String queryFriendHomePage(String userId) {
-        return RequestManager.requestString(
-                "alipay.antforest.forest.h5.queryFriendHomePage",
-                "[{\"canRobFlags\":\"F,F,F,F,F\",\"configVersionMap\":{\"redPacketConfig\":0,\"wateringBubbleConfig\":\"10\"}," +
-                        "\"source\":\"chInfo_ch_appcenter__chsub_9patch\",\"userId\":\""
-                        + userId
-                        + "\",\"version\":\""
-                        + VERSION
-                        + "\"}]",
-                3,
-                1000);
+    public static String queryFriendHomePage(String userId, String fromAct) {
+        try {
+            if (fromAct == null) {
+                fromAct = "TAKE_LOOK_FRIEND";
+            }
+            JSONObject arg = new JSONObject();
+            JSONObject arg1 = new JSONObject();
+            arg1.put("wateringBubbleConfig", "0");
+            arg.put("canRobFlags", "T,F,F,F,F");
+            arg.put("configVersionMap", arg1);
+            arg.put("source", "chInfo_ch_appid-60000002");
+            arg.put("userId", userId);
+            arg.put("fromAct", fromAct);
+            arg.put("version", VERSION);
+            String param = "[" + arg + "]";
+            return RequestManager.requestString("alipay.antforest.forest.h5.queryFriendHomePage", param, 3, 1000);
+        } catch (Exception e) {
+            Log.printStackTrace(e);
+            return "";
+        }
     }
 
-    public static RpcEntity getCollectEnergyRpcEntity(String bizType, String userId, long bubbleId) {
-        String args1;
-        if (StringUtil.isEmpty(bizType)) {
-            args1 =
-                    "[{\"bizType\":\"\",\"bubbleIds\":[" + bubbleId + "],\"source\":\"chInfo_ch_appcenter__chsub_9patch\",\"userId\":\"" + userId + "\"," +
-                            "\"version\":\"" + VERSION + "\"}]";
-        } else {
-            args1 = "[{\"bizType\":\"" + bizType + "\",\"bubbleIds\":[" + bubbleId + "],\"source\":\"chInfo_ch_appcenter__chsub_9patch\",\"userId\":\"" + userId + "\"}]";
+    public static RpcEntity energyRpcEntity(String bizType, String userId, long bubbleId) {
+        try {
+            JSONObject args = new JSONObject();
+            JSONArray bubbleIds = new JSONArray();
+            bubbleIds.put(bubbleId);
+            args.put("bizType", bizType);
+            args.put("bubbleIds", bubbleIds);
+            args.put("source", "chInfo_ch_appcenter__chsub_9patch");
+            args.put("userId", userId);
+            args.put("version", VERSION);
+            String param = "[" + args + "]";
+            return new RpcEntity("alipay.antmember.forest.h5.collectEnergy", param, null);
+        } catch (Exception e) {
+            Log.printStackTrace(e);
+            return null;
         }
-        return new RpcEntity("alipay.antmember.forest.h5.collectEnergy", args1, null);
     }
 
     public static String collectEnergy(String bizType, String userId, Long bubbleId) {
-        return RequestManager.requestString(getCollectEnergyRpcEntity(bizType, userId, bubbleId));
+        RpcEntity r = energyRpcEntity(bizType, userId, bubbleId);
+        if (r == null) {
+            return "";
+        }
+        return RequestManager.requestString(r);
     }
 
-    public static RpcEntity getCollectBatchEnergyRpcEntity(String userId, List<Long> bubbleIdList) {
-        return getCollectBatchEnergyRpcEntity(userId, StringUtil.collectionJoinString(",", bubbleIdList));
+    public static RpcEntity batchEnergyRpcEntity(String bizType, String userId, List<Long> bubbleIds) throws JSONException {
+        JSONObject arg = new JSONObject();
+        arg.put("bizType", bizType);
+        arg.put("bubbleIds", new JSONArray(bubbleIds));
+        arg.put("fromAct", "BATCH_ROB_ENERGY");
+        arg.put("source", "chInfo_ch_appcenter__chsub_9patch");
+        arg.put("userId", userId);
+        arg.put("version", VERSION);
+        String param = "[" + arg + "]";
+        return new RpcEntity("alipay.antmember.forest.h5.collectEnergy", param);
     }
 
-    public static RpcEntity getCollectBatchEnergyRpcEntity(String userId, String bubbleIds) {
-        return new RpcEntity(
-                "alipay.antmember.forest.h5.collectEnergy",
-                "[{\"bizType\":\"\",\"bubbleIds\":["
-                        + bubbleIds
-                        + "],\"fromAct\":\"BATCH_ROB_ENERGY\",\"source\":\"chInfo_ch_appcenter__chsub_9patch\",\"userId\":\""
-                        + userId
-                        + "\",\"version\":\""
-                        + VERSION
-                        + "\"}]");
-    }
-
-    public static String collectBatchEnergy(String userId, List<Long> bubbleId) {
-        return RequestManager.requestString(getCollectBatchEnergyRpcEntity(userId, bubbleId));
-    }
-
+    /**
+     * 收取复活能量
+     *
+     * @return 收取结果
+     */
     public static String collectRebornEnergy() {
-        return RequestManager.requestString("alipay.antforest.forest.h5.collectRebornEnergy", "[{\"source\":\"chInfo_ch_appcenter__chsub_9patch\"}]");
+        try {
+            JSONObject arg = new JSONObject();
+            arg.put("source", "chInfo_ch_appcenter__chsub_9patch");
+            String param = "[" + arg + "]";
+            return RequestManager.requestString("alipay.antforest.forest.h5.collectRebornEnergy", param);
+        } catch (Exception e) {
+            Log.printStackTrace(e);
+            return "";
+        }
     }
 
-    public static String transferEnergy(String targetUser, String bizNo, int energyId) {
-        return RequestManager.requestString(
-                "alipay.antmember.forest.h5.transferEnergy",
-                "[{\"bizNo\":\""
-                        + bizNo
-                        + UUID.randomUUID().toString()
-                        + "\",\"energyId\":"
-                        + energyId
-                        + ",\"extInfo\":{\"sendChat\":\"N\"},\"from\":\"friendIndex\",\"source\":\"chInfo_ch_appcenter__chsub_9patch\",\"targetUser\":\""
-                        + targetUser
-                        + "\",\"transferType\":\"WATERING\",\"version\":\""
-                        + VERSION
-                        + "\"}]");
+    public static String transferEnergy(String targetUser, String bizNo, int energyId, boolean notifyFriend) {
+        try {
+            JSONObject arg = new JSONObject();
+            arg.put("bizNo", bizNo + UUID.randomUUID().toString());
+            arg.put("energyId", energyId);
+            // ✅ 根据 notifyFriend 参数设置是否通知好友
+            arg.put("extInfo", new JSONObject().put("sendChat", notifyFriend ? "Y" : "N"));
+            arg.put("from", "friendIndex");
+            arg.put("source", "chInfo_ch_appcenter__chsub_9patch");
+            arg.put("targetUser", targetUser);
+            arg.put("transferType", "WATERING");
+            arg.put("version", VERSION);
+            String param = "[" + arg + "]";
+            return RequestManager.requestString("alipay.antmember.forest.h5.transferEnergy", param);
+        } catch (Exception e) {
+            Log.printStackTrace(e);
+            return "";
+        }
     }
 
     public static String forFriendCollectEnergy(String targetUserId, long bubbleId) {
@@ -172,6 +257,13 @@ public class AntForestRpcCall {
         jo.put("version", VERSION);
         return RequestManager.requestString("alipay.antforest.forest.h5.queryTaskList", new JSONArray().put(jo).toString());
     }
+
+    public static String queryGameAggCard() {
+        return RequestManager.requestString("com.alipay.gamecenterhome.biz.rpc.queryGameAggCard",
+                "[{\"appearedCardIds\":[],\"deviceLevel\":\"high\",\"pageSize\":6,\"pageStart\":1," +
+                        "\"source\":\"mokuai_senlin_hlz\",\"trafficDriverId\":\"mokuai_senlin_hlz\",\"unityDeviceLevel\":\"high\"}]");
+    }
+
 
     /*青春特权道具任务状态查询🔍*/
     public static String queryTaskListV2(String firstTaskType) throws JSONException {
@@ -241,16 +333,16 @@ public class AntForestRpcCall {
         return RequestManager.requestString("alipay.antforest.forest.h5.popupTask", new JSONArray().put(jo).toString());
     }
 
-    public static String antiepSign(String entityId, String userId) throws JSONException {
+    public static String antiepSign(String entityId, String userId, String sceneCode) throws JSONException {
         // 构造 JSON 对象
         JSONObject jo = new JSONObject();
         jo.put("entityId", entityId);
         jo.put("requestType", "rpc");
-        jo.put("sceneCode", "ANTFOREST_ENERGY_SIGN");
+        jo.put("sceneCode", sceneCode);
         jo.put("source", "ANTFOREST");
         jo.put("userId", userId);
-        // 调用请求
-        return RequestManager.requestString("com.alipay.antiep.sign", new JSONArray().put(jo).toString());
+        String args = "[" + jo + "]";
+        return RequestManager.requestString("com.alipay.antiep.sign", args);
     }
 
     /**
@@ -274,14 +366,78 @@ public class AntForestRpcCall {
         return RequestManager.requestString("alipay.antforest.forest.h5.queryAnimalPropList", new JSONArray().put(jo).toString());
     }
 
-    public static String consumeProp(String propGroup, String propType, Boolean replace) throws JSONException {
+    /**
+     * 创建使用道具的请求数据
+     *
+     * @param propGroup     道具组
+     * @param propId        道具ID
+     * @param propType      道具类型
+     * @param secondConfirm 是否为确认调用（续用时传 true，不传则为null）
+     * @return 请求的JSONObject
+     * @throws JSONException JSON异常
+     */
+    private static JSONObject createConsumePropRequestData(String propGroup, String propId, String propType, Boolean secondConfirm) throws JSONException {
         JSONObject jo = new JSONObject();
-        jo.put("propGroup", propGroup);
+        if (propGroup != null && !propGroup.isEmpty()) {
+            jo.put("propGroup", propGroup);
+        }
+        jo.put("propId", propId);
         jo.put("propType", propType);
-        jo.put("replace", replace.toString());
         jo.put("sToken", System.currentTimeMillis() + "_" + RandomUtil.getRandomString(8));
+        if (secondConfirm != null) {
+            jo.put("secondConfirm", secondConfirm);
+        }
         jo.put("source", "chInfo_ch_appcenter__chsub_9patch");
-        return RequestManager.requestString("alipay.antforest.forest.h5.consumeProp", new JSONArray().put(jo).toString());
+        jo.put("timezoneId", "Asia/Shanghai");
+
+        jo.put("version", VERSION); // Hardcode version for consumeProp based on logs
+        return jo;
+    }
+
+    /**
+     * 调用蚂蚁森林 RPC 使用道具 (可续写/二次确认)
+     *
+     * @param propGroup     道具组
+     * @param propId        道具ID
+     * @param propType      道具类型
+     * @param secondConfirm 是否为确认调用
+     * @return RPC 响应字符串
+     */
+    public static String consumeProp(String propGroup, String propId, String propType, boolean secondConfirm) throws JSONException {
+        JSONObject requestData = createConsumePropRequestData(propGroup, propId, propType, secondConfirm);
+        // Log.record(TAG, "requestData: " + "["+requestData+"]");
+        return RequestManager.requestString(
+                "alipay.antforest.forest.h5.consumeProp",
+                "["+requestData+"]"
+        );
+    }
+
+    /**
+     * 调用蚂蚁森林 RPC 使用道具 (不可续写/直接使用)
+     *
+     * @param propGroup 道具组
+     * @param propId    道具ID
+     * @param propType  道具类型
+     * @return RPC 响应字符串
+     */
+    public static String consumeProp2(String propGroup, String propId, String propType) throws JSONException {
+        JSONObject requestData = createConsumePropRequestData(propGroup, propId, propType, null);
+        return RequestManager.requestString(
+                "alipay.antforest.forest.h5.consumeProp",
+                new JSONArray().put(requestData).toString()
+        );
+    }
+
+    /**
+     * 调用蚂蚁森林 RPC 使用道具 (旧方法，为兼容性保留)
+     *
+     * @param propId        道具ID
+     * @param propType      道具类型
+     * @param secondConfirm 是否为确认调用（续用时传 true）
+     * @return RPC 响应字符串
+     */
+    public static String consumeProp(String propId, String propType, boolean secondConfirm) throws JSONException {
+        return consumeProp("", propId, propType, secondConfirm);
     }
 
     public static String giveProp(String giveConfigId, String propId, String targetUserId) throws JSONException {
@@ -760,7 +916,25 @@ public class AntForestRpcCall {
         return RequestManager.requestString("com.alipay.antieptask.finishTaskopengreen", args);
     }
 
+    /**
+     * 根据道具类型获取道具组
+     * @param propType 道具类型
+     * @return 道具组
+     */
+    public static String getPropGroup(String propType) {
+        if (propType.contains("SHIELD")) {
+            return "shield";
+        } else if (propType.contains("DOUBLE_CLICK")) {
+            return "doubleClick";
+        } else if (propType.contains("STEALTH")) {
+            return "stealthCard";
+        } else if (propType.contains("BOMB_CARD")) {
+            return "energyBombCard";
+        } else if (propType.contains("ROB_EXPAND")) {
+            return "robExpandCard";
+        } else if (propType.contains("BUBBLE_BOOST")) {
+            return "bubbleBoostCard";
+        }
+        return ""; // 默认返回空字符串
+    }
 }
-
-
-

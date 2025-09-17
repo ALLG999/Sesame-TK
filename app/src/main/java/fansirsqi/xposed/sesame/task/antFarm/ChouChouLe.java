@@ -77,9 +77,9 @@ public class ChouChouLe {
                 JSONArray farmTaskList = jo.getJSONArray("farmTaskList");//获取任务列表
                 List<TaskInfo> tasks = parseTasks(farmTaskList);
                 for (TaskInfo task : tasks) {
-                    GlobalThreadPools.sleep(5 * 1000L);
                     if (TaskStatus.FINISHED.name().equals(task.taskStatus)) {
                         if (receiveTaskAward(drawType, task.taskId)) {//领取奖励
+                            GlobalThreadPools.sleep(5 * 1000L);
                             doubleCheck = true;
                         }
                     } else if (TaskStatus.TODO.name().equals(task.taskStatus)) {
@@ -124,6 +124,11 @@ public class ChouChouLe {
             JSONObject jo = new JSONObject(s);
             if (ResChecker.checkRes(TAG, jo)) {
                 Log.farm((drawType.equals("ipDraw") ? "IP抽抽乐" : "抽抽乐") + "🧾️[任务: " + task.title + "]");
+                if(task.title.equals("消耗饲料换机会")) {
+                    GlobalThreadPools.sleep(1 * 1000L);
+                } else {
+                    GlobalThreadPools.sleep(5 * 1000L);
+                }
                 return true;
             }
             return false;
