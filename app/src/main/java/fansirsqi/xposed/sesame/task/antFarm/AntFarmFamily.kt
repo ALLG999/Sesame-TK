@@ -16,7 +16,6 @@ import java.util.Calendar
 import java.util.Objects
 import kotlin.math.abs
 
-
 data object AntFarmFamily {
     private const val TAG = "小鸡家庭"
 
@@ -50,7 +49,6 @@ data object AntFarmFamily {
      */
     private var eatTogetherConfig: JSONObject = JSONObject()
 
-
     fun run(familyOptions: SelectModelField, notInviteList: SelectModelField) {
         try {
             enterFamily(familyOptions, notInviteList)
@@ -64,66 +62,139 @@ data object AntFarmFamily {
      */
     fun enterFamily(familyOptions: SelectModelField, notInviteList: SelectModelField) {
         try {
-            val enterRes = JSONObject(AntFarmRpcCall.enterFamily());
-            if (ResChecker.checkRes(TAG, enterRes)) {
-                if (!enterRes.has("groupId")) {
-                    Log.farm("请先开通小鸡家庭");
-                    return;
-                }
-                groupId = enterRes.getString("groupId")
-                groupName = enterRes.getString("groupName")
-                val familyAwardNum: Int = enterRes.optInt("familyAwardNum", 0)//奖励数量
-                val familySignTips: Boolean = enterRes.optBoolean("familySignTips", false)//签到
-                val assignFamilyMemberInfo: JSONObject? = enterRes.optJSONObject("assignFamilyMemberInfo")//分配成员信息-顶梁柱
-                familyAnimals = enterRes.getJSONArray("animals")//家庭动物列表
-                familyUserIds = (0..<familyAnimals.length())
-                    .map { familyAnimals.getJSONObject(it).getString("userId") }
-                    .toMutableList()
-                familyInteractActions = enterRes.getJSONArray("familyInteractActions")//互动功能列表
-                eatTogetherConfig = enterRes.getJSONObject("eatTogetherConfig")//美食配置对象
+            val enterRes = JSONObject(AntFarmRpcCall.enterFamily())
+            if (!ResChecker.checkRes(TAG, enterRes)) return
 
+            if (!enterRes.has("groupId")) {
+                Log.farm("请先开通小鸡家庭")
+                return
+            }
 
-                if (familyOptions.value.contains("familySign") && familySignTips) {
-                    familySign()
-                }
+            groupId = enterRes.getString("groupId")
+            groupName = enterRes.optString("groupName", "")
+            val familyAwardNum: Int = enterRes.optInt("familyAwardNum", 0) // 奖励数量
+            val familySignTips: Boolean = enterRes.optBoolean("familySignTips", false) // 签到
+            val assignFamilyMemberInfo: JSONObject? = enterRes.optJSONObject("assignFamilyMemberInfo") // 分配成员信息-顶梁柱
 
-                if (assignFamilyMemberInfo != null
-                    && familyOptions.value.contains("assignRights")
-                    && assignFamilyMemberInfo.getJSONObject("assignRights").getString("status") != "USED"
-                ) {
-                    if (assignFamilyMemberInfo.getJSONObject("assignRights").getString("assignRightsOwner") == UserMap.currentUid) {
-                        assignFamilyMember(assignFamilyMemberInfo, familyUserIds)
-                    } else {
-                        Log.record("家庭任务🏡[使用顶梁柱特权] 不是家里的顶梁柱！")
-                        familyOptions.value.remove("assignRights")
-                    }
-                }
+            familyAnimals = enterRes.optJSONArray("animals") ?: JSONArray() // 家庭动物列表
+            familyUserIds = (0 until familyAnimals.length())
+                .map { familyAnimals.getJSONObject(it).getString("userId") }
+                .toMutableList()
 
-                if (familyOptions.value.contains("familyClaimReward") && familyAwardNum > 0) {
-                    familyClaimRewardList()
-                }
+            familyInteractActions = enterRes.optJSONArray("familyInteractActions") ?: JSONArray() // 互动功能列表
+            eatTogetherConfig = enterRes.optJSONObject("eatTogetherConfig") ?: JSONObject() // 美食配置对象
 
-                if (familyOptions.value.contains("feedFamilyAnimal")) {
-                    familyFeedFriendAnimal(familyAnimals)
-                }
+            // 家庭签到
+            if (familyOptions.value.contains("familySign") && familySignTips) {
+                familySign()
+            }
 
-                if (familyOptions.value.contains("eatTogetherConfig")) {
-                    familyEatTogether(eatTogetherConfig, familyInteractActions, familyUserIds)
-                }
-
-                if (familyOptions.value.contains("deliverMsgSend")) {
-                    deliverMsgSend(familyUserIds)
-                }
-
-                if (familyOptions.value.contains("shareToFriends")) {
-                    familyShareToFriends(familyUserIds, notInviteList)
+            // 使用顶梁柱特权
+            if (assignFamilyMemberInfo != null
+                && familyOptions.value.contains("assignRights")
+                && assignFamilyMemberInfo.getJSONObject("assignRights").getString("status") != "USED"
+            ) {
+                if (assignFamilyMemberInfo.getJSONObject("assignRights").getString("assignRightsOwner") == UserMap.currentUid) {
+                    assignFamilyMember(assignFamilyMemberInfo, familyUserIds)
+                } else {
+                    Log.record("家庭任务🏡[使用顶梁柱特权] 不是家里的顶梁柱！")
+                    familyOptions.value.remove("assignRights")
                 }
             }
+
+            // 领取奖励
+            if (familyOptions.value.contains("familyClaimReward") && familyAwardNum > 0) {
+                familyClaimRewardList()
+            }
+
+            // 喂食动物
+            if (familyOptions.value.contains("feedFamilyAnimal")) {
+                familyFeedFriendAnimal(familyAnimals)
+            }
+
+            // 美食互动
+            if (familyOptions.value.contains("eatTogetherConfig")) {
+                familyEatTogether(eatTogetherConfig, familyInteractActions, familyUserIds)
+            }
+
+            // 道早安
+            if (familyOptions.value.contains("deliverMsgSend") && !groupId.isNullOrEmpty()) {
+                deliverMsgSend(familyUserIds)
+            }
+
+            // 分享给好友
+            if (familyOptions.value.contains("shareToFriends")) {
+                familyShareToFriends(familyUserIds, notInviteList)
+            }
+
         } catch (e: Exception) {
             Log.printStackTrace(TAG, e.message, e)
         }
     }
 
+    /**
+     * 安全发送道早安
+     */
+    fun deliverMsgSend(familyUserIds: MutableList<String>) {
+        try {
+            val currentTime = Calendar.getInstance()
+            val startTime = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 6)
+                set(Calendar.MINUTE, 0)
+            }
+            val endTime = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 10)
+                set(Calendar.MINUTE, 0)
+            }
+            if (currentTime.before(startTime) || currentTime.after(endTime)) return
+
+            // 移除自己
+            familyUserIds.remove(UserMap.currentUid)
+            if (familyUserIds.isEmpty()) return
+
+            if (Status.hasFlagToday("antFarm::deliverMsgSend")) return
+
+            val userIds = JSONArray().apply {
+                familyUserIds.forEach { put(it) }
+            }
+
+            val resp0 = JSONObject(AntFarmRpcCall.OpenAIPrivatePolicy())
+            if (!ResChecker.checkRes(TAG, resp0)) return
+
+            val resp1 = JSONObject(AntFarmRpcCall.deliverSubjectRecommend(userIds))
+            if (!ResChecker.checkRes(TAG, resp1)) return
+
+            val ariverRpcTraceId = resp1.getString("ariverRpcTraceId")
+            val eventId = resp1.getString("eventId")
+            val eventName = resp1.getString("eventName")
+            val memo = resp1.getString("memo")
+            val resultCode = resp1.getString("resultCode")
+            val sceneId = resp1.getString("sceneId")
+            val sceneName = resp1.getString("sceneName")
+            val success = resp1.getBoolean("success")
+
+            val resp2 = JSONObject(
+                AntFarmRpcCall.deliverContentExpand(
+                    ariverRpcTraceId, eventId, eventName, memo, resultCode, sceneId, sceneName, success, userIds
+                )
+            )
+            if (!ResChecker.checkRes(TAG, resp2)) return
+
+            val deliverId = resp2.getString("deliverId")
+            val resp3 = JSONObject(AntFarmRpcCall.QueryExpandContent(deliverId))
+            if (!ResChecker.checkRes(TAG, resp3)) return
+
+            val content = resp3.getString("content")
+            val resp4 = JSONObject(AntFarmRpcCall.deliverMsgSend(groupId!!, userIds, content, deliverId))
+            if (ResChecker.checkRes(TAG, resp4)) {
+                Log.farm("家庭任务🏡 道早安: $content")
+                Status.setFlagToday("antFarm::deliverMsgSend")
+            }
+
+        } catch (t: Throwable) {
+            Log.printStackTrace(TAG, "deliverMsgSend err:", t)
+        }
+    }
 
     /**
      * 家庭签到
@@ -195,7 +266,6 @@ data object AntFarmFamily {
         }
     }
 
-
     /**
      * 帮好友喂小鸡
      * @param animals 家庭动物列表
@@ -229,7 +299,6 @@ data object AntFarmFamily {
             Log.printStackTrace(TAG, t)
         }
     }
-
 
     /**
      * 请客吃美食
@@ -324,77 +393,6 @@ data object AntFarmFamily {
         return null
     }
 
-
-    /**
-     * 发送道早安
-     * @param familyUserIds 家庭成员列表
-     */
-    fun deliverMsgSend(familyUserIds: MutableList<String>) {
-        try {
-            val currentTime = Calendar.getInstance()
-            currentTime.get(Calendar.HOUR_OF_DAY)
-            currentTime.get(Calendar.MINUTE)
-            // 6-10点早安时间
-            val startTime = Calendar.getInstance()
-            startTime.set(Calendar.HOUR_OF_DAY, 6)
-            startTime.set(Calendar.MINUTE, 0)
-            val endTime = Calendar.getInstance()
-            endTime.set(Calendar.HOUR_OF_DAY, 10)
-            endTime.set(Calendar.MINUTE, 0)
-            if (currentTime.before(startTime) || currentTime.after(endTime)) {
-                return
-            }
-            if (Objects.isNull(groupId)) {
-                return
-            }
-            // 先移除当前用户自己的ID，否则下面接口报错
-            familyUserIds.remove(UserMap.currentUid)
-            if (familyUserIds.isEmpty()) {
-                return
-            }
-            if (Status.hasFlagToday("antFarm::deliverMsgSend")) {
-                return
-            }
-            val userIds = JSONArray()
-            for (userId in familyUserIds) {
-                userIds.put(userId)
-            }
-            val resp0 = JSONObject(AntFarmRpcCall.OpenAIPrivatePolicy())
-            if (!ResChecker.checkRes(TAG, resp0)) {
-                Log.error(TAG, "OpenAIPrivatePolicy failed")
-                return
-            }
-            val resp1 = JSONObject(AntFarmRpcCall.deliverSubjectRecommend(userIds))
-            if (ResChecker.checkRes(TAG, resp1)) {
-                val ariverRpcTraceId = resp1.getString("ariverRpcTraceId")
-                val eventId = resp1.getString("eventId")
-                val eventName = resp1.getString("eventName")
-                val memo = resp1.getString("memo")
-                val resultCode = resp1.getString("resultCode")
-                val sceneId = resp1.getString("sceneId")
-                val sceneName = resp1.getString("sceneName")
-                val success = resp1.getBoolean("success")
-
-                val resp2 = JSONObject(AntFarmRpcCall.deliverContentExpand(ariverRpcTraceId, eventId, eventName, memo, resultCode, sceneId, sceneName, success, userIds))
-                if (ResChecker.checkRes(TAG, resp2)) {
-                    val deliverId = resp2.getString("deliverId")
-                    val resp3 = JSONObject(AntFarmRpcCall.QueryExpandContent(deliverId))
-                    if (ResChecker.checkRes(TAG, resp3)) {
-                        val content = resp3.getString("content")
-                        val resp4 = JSONObject(AntFarmRpcCall.deliverMsgSend(groupId, userIds, content, deliverId))
-                        if (ResChecker.checkRes(TAG, resp4)) {
-                            Log.farm("家庭任务�道早安: $content �")
-                            Status.setFlagToday("antFarm::deliverMsgSend")
-                        }
-                    }
-                }
-            }
-        } catch (t: Throwable) {
-            Log.printStackTrace(TAG, "deliverMsgSend err:", t)
-        }
-    }
-
-
     /**
      * 好友分享家庭
      * @param familyUserIds 好友列表
@@ -444,7 +442,6 @@ data object AntFarmFamily {
         }
     }
 
-
     /**
      * 通用时间差格式化（自动区分过去/未来）
      * @param diffMillis 任意时间戳（毫秒）
@@ -468,6 +465,4 @@ data object AntFarmFamily {
             else -> "$value$unit 前"
         }
     }
-
-
 }
