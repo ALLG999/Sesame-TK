@@ -28,8 +28,10 @@ import fansirsqi.xposed.sesame.util.Log;
 import fansirsqi.xposed.sesame.util.maps.UserMap;
 import fansirsqi.xposed.sesame.util.RandomUtil;
 import fansirsqi.xposed.sesame.util.ResChecker;
+import fansirsqi.xposed.sesame.data.Config;
 import fansirsqi.xposed.sesame.data.Status;
 import fansirsqi.xposed.sesame.util.TimeUtil;
+import fansirsqi.xposed.sesame.util.TimeCounter;
 
 public class AntSports extends ModelTask {
     private static final String TAG = AntSports.class.getSimpleName();
@@ -47,12 +49,22 @@ public class AntSports extends ModelTask {
     private IntegerModelField minExchangeCount;
     private IntegerModelField latestExchangeTime;
     private IntegerModelField syncStepCount;
-    private BooleanModelField tiyubiz;
-    private BooleanModelField battleForFriends;
+    private BooleanModelField bicubic;
+    private BooleanModelField battleForFriends; // 抢好友总开关
     private ChoiceModelField battleForFriendType;
     private SelectModelField originBossIdList;
     private BooleanModelField sportsTasks;
-    private BooleanModelField coinExchangeDoubleCard;
+
+    // 训练好友相关变量
+    private BooleanModelField trainFriend;
+    private IntegerModelField zeroCoinLimit;
+
+    // 记录训练好友获得0金币的次数
+    private int zeroTrainCoinCount = 0;
+
+    // 运动任务黑名单
+    private StringModelField sportsTaskBlacklist;
+
 
     @Override
     public String getName() {
@@ -72,24 +84,34 @@ public class AntSports extends ModelTask {
     @Override
     public ModelFields getFields() {
         ModelFields modelFields = new ModelFields();
-      //modelFields.addField(walk = new BooleanModelField("walk", "行走路线 | 开启", false));
-      //modelFields.addField(walkPathTheme = new ChoiceModelField("walkPathTheme", "行走路线 | 主题", WalkPathTheme.DA_MEI_ZHONG_GUO, WalkPathTheme.nickNames));
-      //modelFields.addField(walkCustomPath = new BooleanModelField("walkCustomPath", "行走路线 | 开启自定义路线", false));
-      //modelFields.addField(walkCustomPathId = new StringModelField("walkCustomPathId", "行走路线 | 自定义路线代码(debug)", "p0002023122214520001"));
-      //modelFields.addField(openTreasureBox = new BooleanModelField("openTreasureBox", "开启宝箱", false));
-      //modelFields.addField(sportsTasks = new BooleanModelField("sportsTasks", "开启运动任务", false));
-      //modelFields.addField(receiveCoinAsset = new BooleanModelField("receiveCoinAsset", "收运动币", false));
-      //modelFields.addField(donateCharityCoin = new BooleanModelField("donateCharityCoin", "捐运动币 | 开启", false));
-      //modelFields.addField(donateCharityCoinType = new ChoiceModelField("donateCharityCoinType", "捐运动币 | 方式", DonateCharityCoinType.ONE, DonateCharityCoinType.nickNames));
-      //modelFields.addField(donateCharityCoinAmount = new IntegerModelField("donateCharityCoinAmount", "捐运动币 | 数量(每次)", 100));
-      //modelFields.addField(battleForFriends = new BooleanModelField("battleForFriends", "抢好友 | 开启", false));
-      //modelFields.addField(battleForFriendType = new ChoiceModelField("battleForFriendType", "抢好友 | 动作", BattleForFriendType.ROB, BattleForFriendType.nickNames));
-      //modelFields.addField(originBossIdList = new SelectModelField("originBossIdList", "抢好友 | 好友列表", new LinkedHashSet<>(), AlipayUser::getList));
-      //modelFields.addField(tiyubiz = new BooleanModelField("tiyubiz", "文体中心", false));
+        modelFields.addField(walk = new BooleanModelField("walk", "行走路线 | 开启", false));
+        modelFields.addField(walkPathTheme = new ChoiceModelField("walkPathTheme", "行走路线 | 主题", WalkPathTheme.DA_MEI_ZHONG_GUO, WalkPathTheme.nickNames));
+        modelFields.addField(walkCustomPath = new BooleanModelField("walkCustomPath", "行走路线 | 开启自定义路线", false));
+        modelFields.addField(walkCustomPathId = new StringModelField("walkCustomPathId", "行走路线 | 自定义路线代码(debug)", "p0002023122214520001"));
+        modelFields.addField(openTreasureBox = new BooleanModelField("openTreasureBox", "开启宝箱", false));
+        modelFields.addField(sportsTasks = new BooleanModelField("sportsTasks", "开启运动任务", false));
+        modelFields.addField(sportsTaskBlacklist = new StringModelField("sportsTaskBlacklist", "运动任务黑名单 | 任务名称(用,分隔)", "开通包裹查询服务,添加支付宝小组件,领取价值1.7万元配置,支付宝积分可兑券"));
+        modelFields.addField(receiveCoinAsset = new BooleanModelField("receiveCoinAsset", "收运动币", false));
+        modelFields.addField(donateCharityCoin = new BooleanModelField("donateCharityCoin", "捐运动币 | 开启", false));
+        modelFields.addField(donateCharityCoinType = new ChoiceModelField("donateCharityCoinType", "捐运动币 | 方式", DonateCharityCoinType.ONE, DonateCharityCoinType.nickNames));
+        modelFields.addField(donateCharityCoinAmount = new IntegerModelField("donateCharityCoinAmount", "捐运动币 | 数量(每次)", 100));
+
+        // 抢好友相关配置
+        modelFields.addField(battleForFriends = new BooleanModelField("battleForFriends", "抢好友 | 开启", false));
+        modelFields.addField(battleForFriendType = new ChoiceModelField("battleForFriendType", "抢好友 | 动作", BattleForFriendType.ROB, BattleForFriendType.nickNames));
+        modelFields.addField(originBossIdList = new SelectModelField("originBossIdList", "抢好友 | 好友列表", new LinkedHashSet<>(), AlipayUser::getList));
+
+        // 训练好友相关配置
+        modelFields.addField(trainFriend = new BooleanModelField("trainFriend", "训练好友 | 开启", false));
+        modelFields.addField(zeroCoinLimit = new IntegerModelField("zeroCoinLimit", "训练好友 | 0金币上限次数当天关闭", 5));
+
+        modelFields.addField(bicubic = new BooleanModelField("bicubic", "文体中心", false));
         modelFields.addField(minExchangeCount = new IntegerModelField("minExchangeCount", "最小捐步步数", 0));
         modelFields.addField(latestExchangeTime = new IntegerModelField("latestExchangeTime", "最晚捐步时间(24小时制)", 22));
         modelFields.addField(syncStepCount = new IntegerModelField("syncStepCount", "自定义同步步数", 22000));
-      //modelFields.addField(coinExchangeDoubleCard = new BooleanModelField("coinExchangeDoubleCard", "运动币兑换限时能量双击卡", false));
+        // 本地变量，用于添加字段到模型
+        BooleanModelField coinExchangeDoubleCard = new BooleanModelField("coinExchangeDoubleCard", "运动币兑换限时能量双击卡", false);
+        modelFields.addField(coinExchangeDoubleCard);
         return modelFields;
     }
 
@@ -127,11 +149,73 @@ public class AntSports extends ModelTask {
         }
     }
 
+    /**
+     * 检查并重置训练好友状态（每日自动开启）
+     */
+    private void checkAndResetTrainFriendStatus() {
+        // 使用Status标记来记录每日重置状态
+        String resetFlag = "sport::trainFriendDailyReset";
+        // 如果今天还没有重置过，则进行重置
+        if (!Status.hasFlagToday(resetFlag)) {
+            // 重置0金币计数
+            zeroTrainCoinCount = 0;
+            // 如果训练好友功能被关闭了，自动开启
+            if (!trainFriend.getValue()) {
+                trainFriend.setValue(true);
+                Log.record(TAG, "新的一天，自动开启训练好友功能");
+                // 保存配置以确保设置持久化
+                try {
+                    boolean saveResult = Config.save(UserMap.getCurrentUid(), false);
+                    Log.record(TAG, "训练好友自动开启后配置保存结果: " + (saveResult ? "成功" : "失败"));
+                } catch (Exception e) {
+                    Log.record(TAG, "训练好友自动开启后配置保存异常");
+                    Log.printStackTrace(TAG, e);
+                }
+            }
+
+            // 设置今日已重置标记
+            Status.setFlagToday(resetFlag);
+        }
+    }
+
+    /**
+     * 检查并重置运动任务状态（每日自动开启）
+     */
+    private void checkAndResetSportsTasksStatus() {
+        // 使用Status标记来记录每日重置状态
+        String resetFlag = "sport::sportsTasksDailyReset";
+        // 如果今天还没有重置过，则进行重置
+        if (!Status.hasFlagToday(resetFlag)) {
+            // 如果运动任务功能被关闭了，自动开启
+            if (!sportsTasks.getValue()) {
+                sportsTasks.setValue(true);
+                Log.record(TAG, "新的一天，自动开启运动任务功能");
+                // 保存配置以确保设置持久化
+                try {
+                    boolean saveResult = Config.save(UserMap.getCurrentUid(), false);
+                    Log.record(TAG, "运动任务自动开启后配置保存结果: " + (saveResult ? "成功" : "失败"));
+                } catch (Exception e) {
+                    Log.record(TAG, "运动任务自动开启后配置保存异常");
+                    Log.printStackTrace(TAG, e);
+                }
+            }
+
+            // 设置今日已重置标记
+            Status.setFlagToday(resetFlag);
+        }
+    }
+
     @Override
     public void run() {
+        TimeCounter tc = new TimeCounter(TAG);
         Log.record(TAG, "执行开始-" + getName());
-        try {
 
+        // 检查是否需要重置训练好友状态（每日自动开启）
+        checkAndResetTrainFriendStatus();
+
+        // 检查是否需要重置运动任务状态（每日自动开启）
+        checkAndResetSportsTasksStatus();
+        try {
             if (!Status.hasFlagToday("sport::syncStep") && TimeUtil.isNowAfterOrCompareTimeStr("0600")) {
                 addChildTask(new ChildModelTask("syncStep", () -> {
                     int step = tmpStepCount();
@@ -147,34 +231,63 @@ public class AntSports extends ModelTask {
                         Log.printStackTrace(TAG, t);
                     }
                 }));
+                tc.countDebug("同步步数");
             }
-            if (sportsTasks.getValue())
+            if (sportsTasks.getValue()) {
                 sportsTasks();
+                tc.countDebug("运动任务");
+            }
+
             ClassLoader loader = ApplicationHook.getClassLoader();
             if (walk.getValue()) {
                 getWalkPathThemeIdOnConfig();
                 walk();
+                tc.countDebug("行走");
             }
-            if (openTreasureBox.getValue() && !walk.getValue())
+            if (openTreasureBox.getValue() && !walk.getValue()) {
                 queryMyHomePage(loader);
-            if (donateCharityCoin.getValue() && Status.canDonateCharityCoin())
+                tc.countDebug("开启宝箱");
+            }
+
+            if (donateCharityCoin.getValue() && Status.canDonateCharityCoin()) {
                 queryProjectList(loader);
-            if (minExchangeCount.getValue() > 0 && Status.canExchangeToday(UserMap.getCurrentUid()))
+                tc.countDebug("捐运动币");
+            }
+
+            if (minExchangeCount.getValue() > 0 && Status.canExchangeToday(UserMap.getCurrentUid())) {
                 queryWalkStep(loader);
-            if (tiyubiz.getValue()) {
+                tc.countDebug("最小捐步步数");
+            }
+
+            if (bicubic.getValue()) {
                 userTaskGroupQuery("SPORTS_DAILY_SIGN_GROUP");
                 userTaskGroupQuery("SPORTS_DAILY_GROUP");
+                tc.countDebug("查询任务");
                 userTaskRightsReceive();
+                tc.countDebug("userTaskRightsReceive");
                 pathFeatureQuery();
+                tc.countDebug("pathFeatureQuery");
                 participate();
+                tc.countDebug("文体中心");
             }
+            // 抢好友和训练好友是两个独立功能，需要分别检查开关
+            // 抢好友功能
             if (battleForFriends.getValue()) {
+                buyMember();
+                tc.countDebug("抢好友");
+            }
+
+            // 训练好友功能
+            if (trainFriend.getValue()) {
                 queryClubHome();
                 queryTrainItem();
-                buyMember();
+                tc.countDebug("训练好友");
             }
-            if (receiveCoinAsset.getValue())
+            if (receiveCoinAsset.getValue()) {
                 receiveCoinAsset();
+                tc.countDebug("收运动币");
+            }
+            tc.stop();
         } catch (Throwable t) {
             Log.runtime(TAG, "start.run err:");
             Log.printStackTrace(TAG, t);
@@ -228,10 +341,18 @@ public class AntSports extends ModelTask {
     private void sportsTasks() {
         try {
             sportsCheck_in();
+            // 运动任务查询
             JSONObject jo = new JSONObject(AntSportsRpcCall.queryCoinTaskPanel());
+            //  Log.record(TAG,"运动任务响应："+jo);
             if (jo.optBoolean("success")) {
                 JSONObject data = jo.getJSONObject("data");
                 JSONArray taskList = data.getJSONArray("taskList");
+
+                // 统计任务完成状态
+                int totalTasks = 0;
+                int completedTasks = 0;
+                int availableTasks = 0; // 可执行的任务数
+
                 for (int i = 0; i < taskList.length(); i++) {
                     JSONObject taskDetail = taskList.getJSONObject(i);
                     String taskId = taskDetail.getString("taskId");
@@ -241,18 +362,89 @@ public class AntSports extends ModelTask {
                     int currentNum = taskDetail.getInt("currentNum");
                     // 要完成的次数
                     int limitConfigNum = taskDetail.getInt("limitConfigNum") - currentNum;
-                    if (taskStatus.equals("HAS_RECEIVED"))
-                        return;
-                    for (int i1 = 0; i1 < limitConfigNum; i1++) {
-                        jo = new JSONObject(AntSportsRpcCall.completeExerciseTasks(taskId));
-                        if (jo.optBoolean("success")) {
-                            Log.record(TAG, "做任务得运动币👯[完成任务：" + taskName + "，得" + prizeAmount + "💰]");
-                            receiveCoinAsset();
+
+                    // 统计总任务数（排除特殊任务类型）
+                    String taskType = taskDetail.optString("taskType", "");
+                    if (!taskType.equals("SETTLEMENT")) { // 排除步数和锻炼时长等自动完成的任务
+                        totalTasks++;
+
+                        // 获取按钮文本
+                        String buttonText = taskDetail.optString("buttonText", "");
+
+                        // 检查任务是否在黑名单中
+                        String blacklistStr = sportsTaskBlacklist.getValue();
+                        if (blacklistStr != null && !blacklistStr.trim().isEmpty()) {
+                            String[] blacklist = blacklistStr.split(",");
+                            boolean isBlacklisted = false;
+                            for (String blackItem : blacklist) {
+                                if (taskName.contains(blackItem.trim())) {
+                                    isBlacklisted = true;
+                                    break;
+                                }
+                            }
+                            if (isBlacklisted) {
+                                Log.record(TAG, "做任务得运动币👯[任务已屏蔽：" + taskName + "（在黑名单中）]");
+                                completedTasks++; // 将黑名单任务视为已完成
+                                continue;
+                            }
                         }
-                        if (limitConfigNum > 1)
-                            GlobalThreadPools.sleep(10000);
-                        else
-                            GlobalThreadPools.sleep(1000);
+
+                        // 跳过已完成的任务（检查状态和按钮文本）
+                        if (taskStatus.equals("HAS_RECEIVED") || buttonText.equals("任务已完成")) {
+                            Log.record(TAG, "做任务得运动币👯[任务已完成：" + taskName + "，状态：" + taskStatus + "，按钮：" + buttonText + "]");
+                            completedTasks++;
+                            continue;
+                        }
+
+                        // 跳过不需要完成的任务状态
+                        if (!taskStatus.equals("WAIT_RECEIVE") && !taskStatus.equals("WAIT_COMPLETE")) {
+                            Log.record(TAG, "做任务得运动币👯[跳过任务：" + taskName + "，状态：" + taskStatus + "]");
+                            continue;
+                        }
+
+                        // 检查是否需要执行任务
+                        if (limitConfigNum <= 0) {
+                            Log.record(TAG, "做任务得运动币👯[任务无需执行：" + taskName + "，已完成" + currentNum + "/" + taskDetail.getInt("limitConfigNum") + "]");
+                            completedTasks++;
+                            continue;
+                        }
+
+                        // 这是一个可执行的任务
+                        availableTasks++;
+
+                        Log.record(TAG, "做任务得运动币👯[开始执行任务：" + taskName + "，需完成" + limitConfigNum + "次]");
+                        for (int i1 = 0; i1 < limitConfigNum; i1++) {
+                            jo = new JSONObject(AntSportsRpcCall.completeExerciseTasks(taskId));
+                            if (jo.optBoolean("success")) {
+                                Log.record(TAG, "做任务得运动币👯[完成任务：" + taskName + "，得" + prizeAmount + "💰]#(" + (i1 + 1) + "/" + limitConfigNum + ")");
+                                receiveCoinAsset();
+                            } else {
+                                Log.record(TAG, "做任务得运动币👯[任务执行失败：" + taskName + "]#(" + (i1 + 1) + "/" + limitConfigNum + ")");
+                                break; // 失败时跳出循环
+                            }
+                            if (limitConfigNum > 1 && i1 < limitConfigNum - 1) {
+                                GlobalThreadPools.sleep(10000);
+                            }
+                        }
+                        // 任务执行完成后，增加完成计数
+                        completedTasks++;
+                    }
+                }
+
+                // 检查是否所有可执行任务都已完成
+                Log.record(TAG, "运动任务完成情况：" + completedTasks + "/" + totalTasks + "，可执行任务：" + availableTasks);
+
+                // 如果所有可执行的任务都已完成（没有可执行的任务了），自动关闭运动任务功能
+                if (totalTasks > 0 && completedTasks >= totalTasks && availableTasks == 0) {
+                    sportsTasks.setValue(false);
+                    Log.record(TAG, "所有运动任务已完成，自动关闭运动任务功能，明日将自动重新开启");
+                    // 保存配置以确保设置持久化
+                    try {
+                        boolean saveResult = Config.save(UserMap.getCurrentUid(), false);
+                        Log.record(TAG, "运动任务自动关闭后配置保存结果: " + (saveResult ? "成功" : "失败"));
+                    } catch (Exception e) {
+                        Log.record(TAG, "运动任务自动关闭后配置保存异常");
+                        Log.printStackTrace(TAG, e);
                     }
                 }
             }
@@ -323,11 +515,6 @@ public class AntSports extends ModelTask {
                 return;
             }
             String joinedPathId = user.getJSONObject("data").getString("joinedPathId");
-            if (joinedPathId == null) {
-                String pathId = queryJoinPath(walkPathThemeId);
-                joinPath(pathId);
-                return;
-            }
             JSONObject path = queryPath(joinedPathId);
             JSONObject userPathStep = path.getJSONObject("userPathStep");
             if ("COMPLETED".equals(userPathStep.getString("pathCompleteStatus"))) {
@@ -1033,6 +1220,12 @@ public class AntSports extends ModelTask {
     /* 抢好友大战 */
     private void queryClubHome() {
         try {
+            // 检查是否已达到0金币上限
+            int maxCount = zeroCoinLimit.getValue();
+            if (zeroTrainCoinCount >= maxCount) {
+                Log.record(TAG, "训练好友获得0金币已超过" + maxCount + "次，今日不再训练");
+                return;
+            }
             // 发送 RPC 请求获取 club home 数据
             JSONObject clubHomeData = new JSONObject(AntSportsRpcCall.queryClubHome());
             // 处理 mainRoom 中的 bubbleList
@@ -1051,7 +1244,7 @@ public class AntSports extends ModelTask {
         }
     }
 
-    // 抢好友大战-收金币
+    // 训练好友-收金币
     private void processBubbleList(JSONObject object) {
         if (object != null && object.has("bubbleList")) {
             try {
@@ -1065,6 +1258,31 @@ public class AntSports extends ModelTask {
                     // 输出日志信息
                     int fullCoin = bubble.optInt("fullCoin");
                     Log.other(TAG, "训练好友💰️[获得:" + fullCoin + "金币]");
+
+                    // 记录0金币情况
+                    if (fullCoin == 0) {
+                        zeroTrainCoinCount++;
+                        // 获取用户设置的0金币上限次数
+                        int maxCount = zeroCoinLimit.getValue();
+                        // 如果0金币次数达到设置的上限，自动关闭训练好友功能
+                        if (zeroTrainCoinCount >= maxCount) {
+                            trainFriend.setValue(false);
+                            Log.record(TAG, "训练好友获得0金币已超过" + maxCount + "次，自动关闭训练好友功能");
+                            // 保存配置以确保设置持久化
+                            try {
+                                boolean saveResult = Config.save(UserMap.getCurrentUid(), false);
+                                Log.record(TAG, "训练好友自动关闭后配置保存结果: " + (saveResult ? "成功" : "失败"));
+                            } catch (Exception e) {
+                                Log.record(TAG, "训练好友自动关闭后配置保存异常");
+                                Log.printStackTrace(TAG, e);
+                            }
+                            return; // 立即退出处理
+                        } else {
+                            // 显示当前计数情况
+                            Log.record(TAG, "训练好友0金币次数: " + zeroTrainCoinCount + "/" + maxCount);
+                        }
+                    }
+
                     // 添加 1 秒的等待时间
                     GlobalThreadPools.sleep(1000);
                 }
@@ -1075,7 +1293,7 @@ public class AntSports extends ModelTask {
         }
     }
 
-    // 抢好友大战-训练好友
+    // 训练好友-训练操作
     private void queryTrainItem() {
         try {
             // 发送 RPC 请求获取 club home 数据
@@ -1202,8 +1420,10 @@ public class AntSports extends ModelTask {
                                     if (ResChecker.checkRes(TAG, buyMemberResponse)) {
                                         String userName = UserMap.getMaskName(originBossId);
                                         Log.other(TAG, "抢购好友🥋[成功:将 " + userName + " 抢回来]");
-                                        // 执行训练好友
-                                        queryTrainItem();
+                                        // 抢好友成功后，如果训练好友功能开启，则执行训练
+                                        if (trainFriend.getValue()) {
+                                            queryTrainItem();
+                                        }
                                     } else if ("CLUB_AMOUNT_NOT_ENOUGH".equals(buyMemberResponse.getString("resultCode"))) {
                                         Log.record(TAG, "[运动币不足，无法完成抢购好友！]");
                                     } else if ("CLUB_MEMBER_TRADE_PROTECT".equals(buyMemberResponse.getString("resultCode"))) {
