@@ -306,4 +306,32 @@ public class AntSportsRpcCall {
         String requestData = "[{\"chInfo\":\"healthstep\",\"currentBossId\":\"" + currentBossId + "\",\"memberId\":\"" + memberId + "\",\"originBossId\":\"" + originBossId + "\",\"priceInfo\":" + priceInfo + ",\"roomId\":\"" + roomId + "\"}]";
         return RequestManager.requestString("alipay.antsports.club.trade.buyMember", requestData);
     }
+
+    /**
+     * 查询运动首页气泡（可能已替换原 queryCoinBubbleModule）
+     */
+    public static String queryFriendClubHome() {
+        return RequestManager.requestString(
+                "com.alipay.neverland.biz.rpc.queryFriendClubHome",
+                "[{\"apiVersion\":\"energy\",\"chInfo\":\"" + chInfo + "\",\"source\":\"SPORT\"}]"
+        );
+    }
+
+    /**
+     * 领取能量气泡
+     * @param reqJson 构造好的 requestData JSON
+     */
+    public static String pickBubbleTaskEnergy(String reqJson) {
+        // 注意：外层需要传数组形式
+        String payload = "[{" +
+                "\"apiVersion\":\"energy\"," +
+                "\"chInfo\":\"" + chInfo + "\"," +
+                "\"requestData\":[" + reqJson + "]" +
+                "}]";
+
+        return RequestManager.requestString(
+                "com.alipay.neverland.biz.rpc.pickBubbleTaskEnergy",
+                payload
+        );
+    }
 }
