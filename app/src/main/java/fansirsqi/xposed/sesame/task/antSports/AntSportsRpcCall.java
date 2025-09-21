@@ -22,6 +22,7 @@ public class AntSportsRpcCall {
             "            \"PROPV2\",\n" +
             "            \"ASIAN_GAMES\"\n" +
             "        ],\n" ;
+
     // 运动任务查询
     public static String queryCoinTaskPanel() {
         String args1 = "[\n" +
@@ -30,25 +31,48 @@ public class AntSportsRpcCall {
                 "        \"chInfo\": \"ch_appcenter__chsub_9patch\",\n" +
                 "        \"clientAuthStatus\": \"not_support\",\n" +
                 "        \"clientOS\": \"android\",\n" +
-                "        \"features\": " +features+
+                "        \"features\": " + features + ",\n" +   // ← 注意这里要加逗号
                 "        \"topTaskId\": \"\"\n" +
                 "    }\n" +
                 "]";
-        return RequestManager.requestString("com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.queryCoinTaskPanel", args1);
+        return RequestManager.requestString(
+                "com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.queryCoinTaskPanel",
+                args1
+        );
     }
+
     // 去完成任务
     public static String completeExerciseTasks(String taskId) {
         String args1 = "[\n" +
                 "    {\n" +
                 "        \"chInfo\": \"ch_appcenter__chsub_9patch\",\n" +
                 "        \"clientOS\": \"android\",\n" +
-                "        \"features\": " +features+
+                "        \"features\": " + features + ",\n" +   // 注意这里加了逗号
                 "        \"taskAction\": \"JUMP\",\n" +
-                "        \"taskId\": \""+taskId+"\"\n" +
+                "        \"taskId\": \"" + taskId + "\"\n" +
                 "    }\n" +
                 "]";
-        return RequestManager.requestString("com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.completeTask", args1);
+        return RequestManager.requestString(
+                "com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.completeTask",
+                args1
+        );
     }
+
+    // 领取运动任务奖励
+    public static String receiveCoinTaskAward(String taskId) {
+        String args = "[\n" +
+                "    {\n" +
+                "        \"taskId\": \"" + taskId + "\",\n" +
+                "        \"apiVersion\": \"energy\",\n" +
+                "        \"chInfo\": \"medical_health\"\n" +
+                "    }\n" +
+                "]";
+        return RequestManager.requestString(
+                "com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.receiveCoinTaskAward",
+                args
+        );
+    }
+
     public static String sportsCheck_in() {
         String args1 = "[\n" +
                 "    {\n" +
@@ -318,15 +342,16 @@ public class AntSportsRpcCall {
     }
 
     /**
-     * 领取能量气泡
-     * @param reqJson 构造好的 requestData JSON
+     * 领取运动俱乐部气泡
+     * @param bubbleId 气泡ID
      */
-    public static String pickBubbleTaskEnergy(String reqJson) {
-        // 注意：外层需要传数组形式
+    public static String pickBubbleTaskEnergy(String bubbleId) {
         String payload = "[{" +
                 "\"apiVersion\":\"energy\"," +
                 "\"chInfo\":\"" + chInfo + "\"," +
-                "\"requestData\":[" + reqJson + "]" +
+                "\"medEnergyBallInfoRecordIds\":[\"" + bubbleId + "\"]," +
+                "\"pickAllEnergyBall\":false," +
+                "\"source\":\"SPORT\"" +
                 "}]";
 
         return RequestManager.requestString(
@@ -334,4 +359,5 @@ public class AntSportsRpcCall {
                 payload
         );
     }
+
 }
