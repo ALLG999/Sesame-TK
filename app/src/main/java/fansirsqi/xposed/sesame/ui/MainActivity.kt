@@ -33,8 +33,8 @@ import fansirsqi.xposed.sesame.model.SelectModelFieldFunc
 import fansirsqi.xposed.sesame.ui.widget.ListDialog
 import fansirsqi.xposed.sesame.util.AssetUtil
 import fansirsqi.xposed.sesame.util.Detector
-import fansirsqi.xposed.sesame.util.DeviceInfoCard
-import fansirsqi.xposed.sesame.util.DeviceInfoUtil
+import fansirsqi.xposed.sesame.newui.DeviceInfoCard
+import fansirsqi.xposed.sesame.newui.DeviceInfoUtil
 import fansirsqi.xposed.sesame.util.FansirsqiUtil
 import fansirsqi.xposed.sesame.newui.WatermarkView
 import fansirsqi.xposed.sesame.util.Files
