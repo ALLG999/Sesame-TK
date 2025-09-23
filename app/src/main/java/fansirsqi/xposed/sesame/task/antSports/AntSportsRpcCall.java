@@ -22,7 +22,6 @@ public class AntSportsRpcCall {
             "            \"PROPV2\",\n" +
             "            \"ASIAN_GAMES\"\n" +
             "        ],\n" ;
-
     // 运动任务查询
     public static String queryCoinTaskPanel() {
         String args1 = "[\n" +
@@ -31,48 +30,25 @@ public class AntSportsRpcCall {
                 "        \"chInfo\": \"ch_appcenter__chsub_9patch\",\n" +
                 "        \"clientAuthStatus\": \"not_support\",\n" +
                 "        \"clientOS\": \"android\",\n" +
-                "        \"features\": " + features + ",\n" +   // ← 注意这里要加逗号
+                "        \"features\": " +features+
                 "        \"topTaskId\": \"\"\n" +
                 "    }\n" +
                 "]";
-        return RequestManager.requestString(
-                "com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.queryCoinTaskPanel",
-                args1
-        );
+        return RequestManager.requestString("com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.queryCoinTaskPanel", args1);
     }
-
     // 去完成任务
     public static String completeExerciseTasks(String taskId) {
         String args1 = "[\n" +
                 "    {\n" +
                 "        \"chInfo\": \"ch_appcenter__chsub_9patch\",\n" +
                 "        \"clientOS\": \"android\",\n" +
-                "        \"features\": " + features + ",\n" +   // 注意这里加了逗号
+                "        \"features\": " +features+
                 "        \"taskAction\": \"JUMP\",\n" +
-                "        \"taskId\": \"" + taskId + "\"\n" +
+                "        \"taskId\": \""+taskId+"\"\n" +
                 "    }\n" +
                 "]";
-        return RequestManager.requestString(
-                "com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.completeTask",
-                args1
-        );
+        return RequestManager.requestString("com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.completeTask", args1);
     }
-
-    // 领取运动任务奖励
-    public static String receiveCoinTaskAward(String taskId) {
-        String args = "[\n" +
-                "    {\n" +
-                "        \"taskId\": \"" + taskId + "\",\n" +
-                "        \"apiVersion\": \"energy\",\n" +
-                "        \"chInfo\": \"medical_health\"\n" +
-                "    }\n" +
-                "]";
-        return RequestManager.requestString(
-                "com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.receiveCoinTaskAward",
-                args
-        );
-    }
-
     public static String sportsCheck_in() {
         String args1 = "[\n" +
                 "    {\n" +
@@ -84,6 +60,30 @@ public class AntSportsRpcCall {
                 "]";
         return RequestManager.requestString("com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.signInCoinTask", args1);
     }
+// 领取任务奖励 - 默认不领取所有能量球
+public static String pickBubbleTaskEnergy(String medEnergyBallInfoRecordId) {
+    return pickBubbleTaskEnergy(medEnergyBallInfoRecordId, false);
+}
+
+// 领取任务奖励 - 可指定是否领取所有能量球
+public static String pickBubbleTaskEnergy(String medEnergyBallInfoRecordId, boolean pickAllEnergyBall) {
+    String args1 = "[\n" +
+        "    {\n" +
+        "        \"apiVersion\": \"energy\",\n" +
+        "        \"chInfo\": \"medical_health\",\n" +
+        "        \"clientOS\": \"android\",\n" +
+        "        \"features\": " + features +
+        "        \"medEnergyBallInfoRecordIds\": [\"" + medEnergyBallInfoRecordId + "\"],\n" +
+        "        \"pickAllEnergyBall\": " + pickAllEnergyBall + ",\n" +
+        "        \"source\": \"SPORT\"\n" +
+        "    }\n" +
+        "]";
+    return RequestManager.requestString("com.alipay.neverland.biz.rpc.pickBubbleTaskEnergy", args1);
+}
+
+
+
+
     public static String queryCoinBubbleModule() {
         return RequestManager.requestString("com.alipay.sportshealth.biz.rpc.sportsHealthHomeRpc.queryCoinBubbleModule",
                 "[{\"bubbleId\":\"\",\"canAddHome\":false,\"chInfo\":\"" + chInfo
@@ -179,60 +179,60 @@ public class AntSportsRpcCall {
      */
     // 查询用户
     public static String queryUser() {
-        return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryUser",
-                "[{\"source\":\"ch_appcenter__chsub_9patch\",\"timeZone\":\"" + timeZone + "\"}]");
+            return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryUser",
+                            "[{\"source\":\"ch_appcenter__chsub_9patch\",\"timeZone\":\"" + timeZone + "\"}]");
     }
     // 查询主题列表
     public static String queryThemeList() {
-        return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.theme.queryThemeList",
-                "[{\"chInfo\":\"ch_appcenter__chsub_9patch\",\"clientOS\":\"android\","
-                        + "\"features\":[\"DAILY_STEPS_RANK_V2\",\"STEP_BATTLE\",\"CLUB_HOME_CARD\",\"NEW_HOME_PAGE_STATIC\",\"CLOUD_SDK_AUTH\",\"STAY_ON_COMPLETE\",\"EXTRA_TREASURE_BOX\",\"SUPPORT_AI\",\"SUPPORT_FLYRABBIT\",\"SUPPORT_NEW_MATCH\",\"EXTERNAL_ADVERTISEMENT_TASK\",\"PROP\",\"PROPV2\",\"ASIAN_GAMES\"]"
-                        + "}]");
+            return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.theme.queryThemeList",
+                            "[{\"chInfo\":\"ch_appcenter__chsub_9patch\",\"clientOS\":\"android\","
+                                            + "\"features\":[\"DAILY_STEPS_RANK_V2\",\"STEP_BATTLE\",\"CLUB_HOME_CARD\",\"NEW_HOME_PAGE_STATIC\",\"CLOUD_SDK_AUTH\",\"STAY_ON_COMPLETE\",\"EXTRA_TREASURE_BOX\",\"SUPPORT_AI\",\"SUPPORT_FLYRABBIT\",\"SUPPORT_NEW_MATCH\",\"EXTERNAL_ADVERTISEMENT_TASK\",\"PROP\",\"PROPV2\",\"ASIAN_GAMES\"]"
+                                            + "}]");
     }
     // 查询世界地图
     public static String queryWorldMap(String themeId) {
-        return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryWorldMap",
-                "[{\"chInfo\":\"ch_appcenter__chsub_9patch\",\"clientOS\":\"android\","
-                        + "\"features\":[\"DAILY_STEPS_RANK_V2\",\"STEP_BATTLE\",\"CLUB_HOME_CARD\",\"NEW_HOME_PAGE_STATIC\",\"CLOUD_SDK_AUTH\",\"STAY_ON_COMPLETE\",\"EXTRA_TREASURE_BOX\",\"SUPPORT_AI\",\"SUPPORT_FLYRABBIT\",\"SUPPORT_NEW_MATCH\",\"EXTERNAL_ADVERTISEMENT_TASK\",\"PROP\",\"PROPV2\",\"ASIAN_GAMES\"]"
-                        + ",\"themeId\":\"" + themeId + "\"}]");
+            return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryWorldMap",
+                            "[{\"chInfo\":\"ch_appcenter__chsub_9patch\",\"clientOS\":\"android\","
+                                            + "\"features\":[\"DAILY_STEPS_RANK_V2\",\"STEP_BATTLE\",\"CLUB_HOME_CARD\",\"NEW_HOME_PAGE_STATIC\",\"CLOUD_SDK_AUTH\",\"STAY_ON_COMPLETE\",\"EXTRA_TREASURE_BOX\",\"SUPPORT_AI\",\"SUPPORT_FLYRABBIT\",\"SUPPORT_NEW_MATCH\",\"EXTERNAL_ADVERTISEMENT_TASK\",\"PROP\",\"PROPV2\",\"ASIAN_GAMES\"]"
+                                            + ",\"themeId\":\"" + themeId + "\"}]");
     }
     // 查询城市路线
     public static String queryCityPath(String cityId) {
-        return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryCityPath",
-                "[{\"chInfo\":\"ch_appcenter__chsub_9patch\",\"clientOS\":\"android\","
-                        + "\"features\":[\"DAILY_STEPS_RANK_V2\",\"STEP_BATTLE\",\"CLUB_HOME_CARD\",\"NEW_HOME_PAGE_STATIC\",\"CLOUD_SDK_AUTH\",\"STAY_ON_COMPLETE\",\"EXTRA_TREASURE_BOX\",\"SUPPORT_AI\",\"SUPPORT_FLYRABBIT\",\"SUPPORT_NEW_MATCH\",\"EXTERNAL_ADVERTISEMENT_TASK\",\"PROP\",\"PROPV2\",\"ASIAN_GAMES\"]"
-                        + ",\"cityId\":\"" + cityId + "\"}]");
+            return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryCityPath",
+                            "[{\"chInfo\":\"ch_appcenter__chsub_9patch\",\"clientOS\":\"android\","
+                                            + "\"features\":[\"DAILY_STEPS_RANK_V2\",\"STEP_BATTLE\",\"CLUB_HOME_CARD\",\"NEW_HOME_PAGE_STATIC\",\"CLOUD_SDK_AUTH\",\"STAY_ON_COMPLETE\",\"EXTRA_TREASURE_BOX\",\"SUPPORT_AI\",\"SUPPORT_FLYRABBIT\",\"SUPPORT_NEW_MATCH\",\"EXTERNAL_ADVERTISEMENT_TASK\",\"PROP\",\"PROPV2\",\"ASIAN_GAMES\"]"
+                                            + ",\"cityId\":\"" + cityId + "\"}]");
     }
     // 查询路线
     public static String queryPath(String appId, String date, String pathId) {
-        String wufuRewardType = "WUFU_CARD";
-        return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryPath",
-                "[{\"appId\":\"" + appId + "\",\"date\":\"" + date + "\",\"pathId\":\"" + pathId
-                        + "\",\"source\":\"ch_appcenter__chsub_9patch\",\"timeZone\":\"" + timeZone
-                        + "\",\"wufuRewardType\":\"" + wufuRewardType + "\"}]");
+            String wufuRewardType = "WUFU_CARD";
+            return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryPath",
+                            "[{\"appId\":\"" + appId + "\",\"date\":\"" + date + "\",\"pathId\":\"" + pathId
+                                            + "\",\"source\":\"ch_appcenter__chsub_9patch\",\"timeZone\":\"" + timeZone
+                                            + "\",\"wufuRewardType\":\"" + wufuRewardType + "\"}]");
     }
     // 加入路线
     public static String joinPath(String pathId) {
-        return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.joinPath",
-                "[{\"pathId\":\"" + pathId + "\",\"source\":\"ch_appcenter__chsub_9patch\"}]");
+            return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.joinPath",
+                            "[{\"pathId\":\"" + pathId + "\",\"source\":\"ch_appcenter__chsub_9patch\"}]");
     }
     // 行走路线
     public static String walkGo(String appId, String date, String pathId, int useStepCount) {
         return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.go",
-                "[{\"appId\":\"" + appId + "\",\"date\":\"" + date + "\",\"pathId\":\"" + pathId
+        "[{\"appId\":\"" + appId + "\",\"date\":\"" + date + "\",\"pathId\":\"" + pathId
                         + "\",\"source\":\"ch_appcenter__chsub_9patch\",\"timeZone\":\"" + timeZone
                         + "\",\"useStepCount\":\"" + useStepCount + "\"}]");
     }
     // 开启宝箱
     // eventBillNo = boxNo(WalkGo)
     public static String receiveEvent(String eventBillNo) {
-        return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.receiveEvent",
-                "[{\"eventBillNo\":\"" + eventBillNo + "\"}]");
+            return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.receiveEvent",
+                            "[{\"eventBillNo\":\"" + eventBillNo + "\"}]");
     }
     // 查询路线奖励
     public static String queryPathReward(String appId, String pathId) {
-        return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryPathReward", "[{\"appId\":\""
-                + appId + "\",\"pathId\":\"" + pathId + "\",\"source\":\"ch_appcenter__chsub_9patch\"}]");
+            return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryPathReward", "[{\"appId\":\""
+                            + appId + "\",\"pathId\":\"" + pathId + "\",\"source\":\"ch_appcenter__chsub_9patch\"}]");
     }
     /* 这个好像没用 */
     public static String exchangeSuccess(String exchangeId) {
@@ -330,34 +330,4 @@ public class AntSportsRpcCall {
         String requestData = "[{\"chInfo\":\"healthstep\",\"currentBossId\":\"" + currentBossId + "\",\"memberId\":\"" + memberId + "\",\"originBossId\":\"" + originBossId + "\",\"priceInfo\":" + priceInfo + ",\"roomId\":\"" + roomId + "\"}]";
         return RequestManager.requestString("alipay.antsports.club.trade.buyMember", requestData);
     }
-
-    /**
-     * 查询运动首页气泡（可能已替换原 queryCoinBubbleModule）
-     */
-    public static String queryFriendClubHome() {
-        return RequestManager.requestString(
-                "com.alipay.neverland.biz.rpc.queryFriendClubHome",
-                "[{\"apiVersion\":\"energy\",\"chInfo\":\"" + chInfo + "\",\"source\":\"SPORT\"}]"
-        );
-    }
-
-    /**
-     * 领取运动俱乐部气泡
-     * @param bubbleId 气泡ID
-     */
-    public static String pickBubbleTaskEnergy(String bubbleId) {
-        String payload = "[{" +
-                "\"apiVersion\":\"energy\"," +
-                "\"chInfo\":\"" + chInfo + "\"," +
-                "\"medEnergyBallInfoRecordIds\":[\"" + bubbleId + "\"]," +
-                "\"pickAllEnergyBall\":false," +
-                "\"source\":\"SPORT\"" +
-                "}]";
-
-        return RequestManager.requestString(
-                "com.alipay.neverland.biz.rpc.pickBubbleTaskEnergy",
-                payload
-        );
-    }
-
 }
