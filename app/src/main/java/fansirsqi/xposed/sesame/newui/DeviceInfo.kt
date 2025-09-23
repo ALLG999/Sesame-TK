@@ -84,6 +84,12 @@ fun DeviceInfoCard(info: Map<String, String>) {
                 }
                 Spacer(modifier = Modifier.height(4.dp))
             }
+            // 循环外单独显示红色自定义文字
+            Text(
+                text = "ALLG魔改版本，与原版不一样哦。👑",
+                fontSize = 12.sp,
+                color = Color.Red
+                )
         }
     }
 }
