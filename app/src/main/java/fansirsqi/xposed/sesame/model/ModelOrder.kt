@@ -16,6 +16,7 @@ import fansirsqi.xposed.sesame.task.reserve.Reserve
 import fansirsqi.xposed.sesame.task.consumeGold.ConsumeGold;
 import fansirsqi.xposed.sesame.task.greenFinance.GreenFinance;
 import fansirsqi.xposed.sesame.task.antBookRead.AntBookRead;
+import fansirsqi.xposed.sesame.task.antGroup.AntGroup
 import fansirsqi.xposed.sesame.task.omegakoiTown.OmegakoiTown;
 
 object ModelOrder {
@@ -24,15 +25,16 @@ object ModelOrder {
         AntForest::class.java,       // 森林
         AntFarm::class.java,         // 庄园
         AntOcean::class.java,        // 海洋
-        AntOrchard::class.java,    // 农场
-        AntStall::class.java,      // 蚂蚁新村
-        AntDodo::class.java,       // 神奇物种
+        AntOrchard::class.java,      // 农场
+        AntStall::class.java,        // 蚂蚁新村
+        AntDodo::class.java,         // 神奇物种
         AntCooperate::class.java,    // 合种
         AntSports::class.java,       // 运动
-        AntMember::class.java,     // 会员
+        AntMember::class.java,       // 会员
+        AntGroup::class.java,        // 芝麻树
         AncientTree::class.java,     // 古树
-        GreenFinance::class.java,  // 绿色经营
-        Reserve::class.java,       // 保护地
+        GreenFinance::class.java,    // 绿色经营
+        Reserve::class.java,         // 保护地
         AnswerAI::class.java         // AI答题
         //AntBookRead::class.java,   // 读书
         //ConsumeGold::class.java,   // 消费金
