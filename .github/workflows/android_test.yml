@@ -1,11 +1,7 @@
-name: 📦构建027魔改版本
-run-name: 📦 ${{ github.actor }} @ 构建027魔改版本
+name: 📦构建027魔改测试版本
+run-name: 📦 ${{ github.actor }} @ 构建027魔改测试版本
 
 on:
-  push:
-    branches: ["n"]
-  pull_request:
-    branches: ["n"]
   workflow_dispatch:
 
 jobs:
@@ -124,7 +120,7 @@ jobs:
           NORMAL_FILE: ${{ steps.extract_apks.outputs.signed_normal }}
           COMPATIBLE_FILE: ${{ steps.extract_apks.outputs.signed_compatible }}
           COMMIT_MESSAGE: |+
-            🎉 new Version build Scuess！
+            🎉 魔改测试版本，不稳定，请勿更新！
             ```
             ${{ github.event.head_commit.message || github.event.pull_request.title || '手动触发构建' }}
 
