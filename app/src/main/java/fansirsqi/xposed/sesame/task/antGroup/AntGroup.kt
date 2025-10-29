@@ -12,6 +12,7 @@ import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField
 import fansirsqi.xposed.sesame.task.ModelTask
 import fansirsqi.xposed.sesame.task.TaskCommon
 import fansirsqi.xposed.sesame.util.CoroutineUtils
+import fansirsqi.xposed.sesame.util.HttpUtil
 import fansirsqi.xposed.sesame.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
@@ -107,9 +108,9 @@ class AntGroup : ModelTask() {
         return field?.value == true
     }
 
-    // 通用RPC请求
+    // 发送RPC请求
     private fun sendRpcRequest(apiName: String, payload: JSONObject): JSONObject? {
-        val response = RpcEntity.sendRequest(RpcEntity(requestMethod = "POST", requestData = payload.toString(), methodName = apiName))
+        val response = HttpUtil.post(apiName, payload.toString()) // 使用 HttpUtil 的 post 方法
         val jsonResponse = JSONObject(response)
         return if (ResChecker.checkRes(TAG, jsonResponse)) jsonResponse else null
     }
@@ -216,175 +217,29 @@ class AntGroup : ModelTask() {
         try {
             val response = sendRpcRequest("com.alipay.creditapollon.venue.page.layout.query", JSONObject().apply {
                 put("aseChannelId", "RENT")
-                put("venuePageId", "HOME_PAGE")
+                put("page", 1)
             })
-
             response?.let {
-                val homePageResult = it.getJSONObject("Data")
-                    .getJSONObject("resData")
-                    .getJSONObject("extInfo")
-                    .getJSONObject("zhimaTreeHomePageQueryResult")
-
-                if (homePageResult.has("browseTaskList")) {
-                    val browseTasks = homePageResult.getJSONArray("browseTaskList")
-                    for (i in 0 until browseTasks.length()) {
-                        val task = browseTasks.getJSONObject(i)
-                        val taskDetail = parseHomeBrowseTask(task)
-                        if (isTaskValid(taskDetail)) taskList.add(taskDetail)
-                    }
+                val tasks = it.getJSONArray("tasks")
+                for (i in 0 until tasks.length()) {
+                    taskList.add(parseTaskDetail(tasks.getJSONObject(i)))
                 }
-                parseTreeStatus(homePageResult)
             }
         } catch (t: Throwable) {
-            Log.printStackTrace(TAG, "首页查询异常", t)
+            Log.printStackTrace(TAG, "查询首页任务失败", t)
         }
         return taskList
     }
 
-    private fun parseTreeStatus(homePageResult: JSONObject) {
-        try {
-            val trees = homePageResult.getJSONArray("trees")
-            if (trees.length() > 0) {
-                val tree = trees.getJSONObject(0)
-                val scoreSummary = tree.optInt("scoreSummary", 0)
-                val currentLevelProcessState = tree.optInt("currentLevelProcessState", 0)
-                val treeLevel = tree.optInt("treeLevel", 1)
-                Log.record(TAG, "芝麻树状态: 等级${treeLevel}, 净化值${scoreSummary}, 进度${currentLevelProcessState}%")
-            }
-        } catch (e: Exception) {
-            Log.printStackTrace(TAG, "解析树木状态异常", e)
-        }
-    }
-
-    private fun parseHomeBrowseTask(taskData: JSONObject): TaskDetail {
-        val taskMaterial = taskData.optJSONObject("taskMaterial") ?: JSONObject()
-        val taskBaseInfo = taskData.optJSONObject("taskBaseInfo") ?: JSONObject()
-        
+    private fun parseTaskDetail(taskJson: JSONObject): TaskDetail {
         return TaskDetail(
-            taskId = taskData.optString("taskId", ""),
-            appletId = taskBaseInfo.optString("appletId", ""),
-            taskName = taskBaseInfo.optString("appletName", ""),
-            taskType = taskData.optString("taskType", ""),
-            taskProcessStatus = taskData.optString("taskProcessStatus", "NOT_DONE"),
-            canAccess = taskData.optBoolean("canAccess", false),
-            needManuallyReceiveAward = taskData.optBoolean("needManuallyReceiveAward", false),
-            needSignUp = taskData.optBoolean("needSignUp", false),
-            accessLimitCount = taskData.optInt("accessLimitCount", 0),
-            accessLimitDimension = taskData.optString("accessLimitDimension", "L"),
-            periodCurrentCompleteNum = taskData.optInt("periodCurrentCompleteNum", 0),
-            periodTotalCompleteNum = taskData.optInt("periodTotalCompleteNum", 1),
-            finishOneTaskGetPurificationValue = taskMaterial.optString("finishOneTaskGetPurificationValue", "0").toIntOrNull() ?: 0,
-            title = taskMaterial.optString("title", ""),
-            subTitle = taskMaterial.optString("subTitle", ""),
-            taskIcon = taskMaterial.optString("taskIcon", ""),
-            buttonTextNotComplete = taskMaterial.optString("buttonTextNotComplete", ""),
-            buttonTextFinished = taskMaterial.optString("buttonTextFinished", ""),
-            browseTime = taskMaterial.optString("Input_GxmW", "15"),
-            jumpUrl = null,
-            taskOrderId = null,
-            lastReceiveExpireTime = null,
-            queryErrorCode = null,
-            queryErrorMsg = null,
-            prizeDetails = parsePrizeDetailsFromHomeTask(taskData)
+            taskId = taskJson.optString("taskId"),
+            taskType = taskJson.optString("taskType"),
+            taskStatus = taskJson.optString("taskStatus"),
+            taskTitle = taskJson.optString("taskTitle"),
+            reward = taskJson.optString("reward"),
+            browseTime = taskJson.optString("browseTime"),
+            finishReward = taskJson.optString("finishReward")
         )
     }
-
-    private fun parsePrizeDetailsFromHomeTask(taskData: JSONObject): List<PrizeDetail> {
-        val prizeDetails = mutableListOf<PrizeDetail>()
-        try {
-            val prizeArray = taskData.optJSONArray("validPrizeDetailDTO") ?: return prizeDetails
-
-            for (i in 0 until prizeArray.length()) {
-                val prize = prizeArray.getJSONObject(i)
-                val baseInfo = prize.getJSONObject("prizeBaseInfoDTO")
-                val displayInfo = prize.optJSONObject("prizeCustomDisplayInfoDTO")
-
-                prizeDetails.add(PrizeDetail(
-                    prizeId = prize.optString("prizeId", ""),
-                    prizeName = baseInfo.optString("prizeName", ""),
-                    prizeStatus = baseInfo.optString("prizeStatus", ""),
-                    budgetStatus = baseInfo.optString("budgetStatus", ""),
-                    budgetAmount = baseInfo.optLong("budgetAmount", 0),
-                    budgetType = baseInfo.optString("budgetType", ""),
-                    amountUnitText = displayInfo?.optString("amountUnitText", "") ?: "",
-                    formType = displayInfo?.optString("formType", "") ?: "",
-                    prizeFrequency = "",
-                    energyValue = 0
-                ))
-            }
-        } catch (e: Exception) {
-            Log.printStackTrace(TAG, "解析奖励详情异常", e)
-        }
-        return prizeDetails
-    }
-
-    private fun isTaskValid(task: TaskDetail): Boolean {
-        // 检查排除列表
-        if (excludedTaskList!!.value.contains(task.taskId)) {
-            return false
-        }
-
-        // 只处理未完成且可访问的任务
-        if (!task.canAccess || task.taskProcessStatus != "NOT_DONE") {
-            return false
-        }
-
-        // 根据过滤类型检查
-        return when (taskFilterType!!.value) {
-            1 -> task.finishOneTaskGetPurificationValue == 50
-            2 -> task.finishOneTaskGetPurificationValue >= 100
-            else -> true
-        }
-    }
-
-    /**
-     * 任务详情数据类
-     */
-    data class TaskDetail(
-        val taskId: String,
-        val appletId: String,
-        val taskName: String,
-        val taskType: String,
-        val taskProcessStatus: String,
-        val canAccess: Boolean,
-        val needManuallyReceiveAward: Boolean,
-        val needSignUp: Boolean,
-        val accessLimitCount: Int,
-        val accessLimitDimension: String,
-        val periodCurrentCompleteNum: Int,
-        val periodTotalCompleteNum: Int,
-        val finishOneTaskGetPurificationValue: Int,
-        val title: String,
-        val subTitle: String,
-        val taskIcon: String,
-        val buttonTextNotComplete: String,
-        val buttonTextFinished: String,
-        val browseTime: String?,
-        val jumpUrl: String?,
-        val taskOrderId: String?,
-        val lastReceiveExpireTime: Long?,
-        val queryErrorCode: String?,
-        val queryErrorMsg: String?,
-        val prizeDetails: List<PrizeDetail>
-    ) {
-        val isCompleted: Boolean get() = taskProcessStatus == "RECEIVE_SUCCESS"
-        val canComplete: Boolean get() = canAccess && taskProcessStatus == "NOT_DONE"
-        val hasRewardToReceive: Boolean get() = taskProcessStatus == "RECEIVE_SUCCESS" && needManuallyReceiveAward
-    }
-
-    /**
-     * 奖励详情数据类
-     */
-    data class PrizeDetail(
-        val prizeId: String,
-        val prizeName: String,
-        val prizeStatus: String,
-        val budgetStatus: String,
-        val budgetAmount: Long,
-        val budgetType: String,
-        val amountUnitText: String,
-        val formType: String,
-        val prizeFrequency: String,
-        val energyValue: Int
-    )
 }
