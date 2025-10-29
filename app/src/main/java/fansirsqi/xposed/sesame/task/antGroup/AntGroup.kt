@@ -110,9 +110,14 @@ class AntGroup : ModelTask() {
 
     // 发送RPC请求
     private fun sendRpcRequest(apiName: String, payload: JSONObject): JSONObject? {
-        val response = HttpUtil.post(apiName, payload.toString()) // 使用 HttpUtil 的 post 方法
-        val jsonResponse = JSONObject(response)
-        return if (ResChecker.checkRes(TAG, jsonResponse)) jsonResponse else null
+        try {
+            val response = HttpUtil.post(apiName, payload.toString()) // 使用 HttpUtil 的 post 方法
+            val jsonResponse = JSONObject(response)
+            return if (ResChecker.checkRes(TAG, jsonResponse)) jsonResponse else null
+        } catch (e: Exception) {
+            Log.printStackTrace(TAG, "Error during RPC request", e)
+            return null
+        }
     }
 
     private fun queryEnergyStatus() {
