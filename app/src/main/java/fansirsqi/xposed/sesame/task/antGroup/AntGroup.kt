@@ -126,7 +126,7 @@ class AntGroup : ModelTask() {
 
         } catch (t: Throwable) {
             Log.runtime(TAG, "run error:")
-            Log.error(TAG, "执行任务异常", t)
+            Log.printStackTrace(TAG, t)
         } finally {
             Log.record(TAG, "执行结束-${getName()}")
         }
@@ -153,9 +153,9 @@ class AntGroup : ModelTask() {
                 Log.runtime(TAG, "查询能量状态失败: ${jsonResponse.optString("resultDesc", "未知错误")}")
             }
         } catch (e: JSONException) {
-            Log.error(TAG, "能量查询JSON解析错误", e)
+            Log.printStackTrace(TAG, e)
         } catch (t: Throwable) {
-            Log.error(TAG, "查询能量状态异常", t)
+            Log.printStackTrace(TAG, t)
         }
     }
 
@@ -208,9 +208,9 @@ class AntGroup : ModelTask() {
                 Log.runtime(TAG, "查询首页失败: ${jsonResponse.optString("resultDesc", "未知错误")}")
             }
         } catch (e: JSONException) {
-            Log.error(TAG, "首页JSON解析错误", e)
+            Log.printStackTrace(TAG, e)
         } catch (t: Throwable) {
-            Log.error(TAG, "处理首页任务异常", t)
+            Log.printStackTrace(TAG, t)
         }
         
         return taskList
@@ -279,7 +279,7 @@ class AntGroup : ModelTask() {
                 ))
             }
         } catch (e: Exception) {
-            Log.error(TAG, "解析首页任务奖励详情异常", e)
+            Log.printStackTrace(TAG, e)
         }
         return prizeDetails
     }
@@ -319,7 +319,7 @@ class AntGroup : ModelTask() {
 
                 GlobalThreadPools.sleepCompat(1000)
             } catch (t: Throwable) {
-                Log.error(TAG, "处理浏览任务[${task.title}]异常", t)
+                Log.printStackTrace(TAG, t)
             }
         }
     }
@@ -350,7 +350,7 @@ class AntGroup : ModelTask() {
                 Log.runtime(TAG, "执行浏览任务[${task.title}]失败: ${finishJson.optString("resultDesc", "未知错误")}")
             }
         } catch (t: Throwable) {
-            Log.error(TAG, "执行浏览任务[${task.title}]异常", t)
+            Log.printStackTrace(TAG, t)
         }
     }
 
@@ -385,7 +385,7 @@ class AntGroup : ModelTask() {
                     GlobalThreadPools.sleepCompat(800)
                 }
             } catch (t: Throwable) {
-                Log.error(TAG, "领取任务[${task.title}]奖励异常", t)
+                Log.printStackTrace(TAG, t)
             }
         }
         
@@ -421,7 +421,7 @@ class AntGroup : ModelTask() {
                 ))
             }
         } catch (e: Exception) {
-            Log.error(TAG, "解析奖励详情异常", e)
+            Log.printStackTrace(TAG, e)
         }
         return prizeDetails
     }
