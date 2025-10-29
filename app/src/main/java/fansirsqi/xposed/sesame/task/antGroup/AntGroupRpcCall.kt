@@ -1,6 +1,6 @@
 package fansirsqi.xposed.sesame.rpc
 
-import fansirsqi.xposed.sesame.entity.RpcEntity
+import fansirsqi.xposed.sesame.util.HttpUtil
 import fansirsqi.xposed.sesame.util.CoroutineUtils
 import fansirsqi.xposed.sesame.util.Log
 import org.json.JSONObject
@@ -24,7 +24,7 @@ object AntGroupRpcCall {
     private fun buildPayload(vararg params: Pair<String, Any>): JSONObject {
         return JSONObject().apply {
             put("aseChannelId", ASE_CHANNEL_ID)
-            params.forEach { (key, value) ->
+            params.forEach { (key, value) -> 
                 put(key, value)
             }
         }
@@ -34,20 +34,23 @@ object AntGroupRpcCall {
      * 发送 RPC 请求并记录日志
      */
     private fun sendRequest(apiName: String, payload: JSONObject): String? {
-        val rpcEntity = RpcEntity(requestMethod = "POST", requestData = payload.toString(), methodName = apiName)
+        val apiUrl = "https://yourapiurl.com/api/$apiName" // 请替换为正确的 API URL
 
+        var responseString: String? = null
         CoroutineUtils.runOnIO {
             try {
                 Log.debug("Sending request to $apiName with payload: ${payload.toString()}")
-                // 通过 RpcEntity 发送请求
-                val response = RpcEntity.sendRequest(rpcEntity)
-                Log.debug("Received response from $apiName: $response")
+                
+                // 通过 HttpUtil 发送 POST 请求
+                responseString = HttpUtil.post(apiUrl, payload.toString())
+                
+                Log.debug("Received response from $apiName: $responseString")
             } catch (e: Exception) {
                 Log.printStackTrace("Error while sending request to $apiName", e)
             }
         }
 
-        return rpcEntity.responseString // 返回原始 JSON 字符串
+        return responseString // 返回原始 JSON 字符串
     }
 
     /**
