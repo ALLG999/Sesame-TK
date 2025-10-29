@@ -138,19 +138,36 @@ class AntGroup : ModelTask() {
             val jsonResponse = JSONObject(response)
 
             if (ResChecker.checkRes(TAG, jsonResponse)) {
-                val data = jsonResponse.getJSONObject("Data")
-                val resData = data.getJSONObject("resData")
-                val extInfo = resData.getJSONObject("extInfo")
-                val energyResult = extInfo.getJSONObject("zhimaTreeAccountEnergyQueryResult")
+                // 根据实际返回结构解析，可能没有Data字段
+                val energyResult = if (jsonResponse.has("Data")) {
+                    val data = jsonResponse.getJSONObject("Data")
+                    val resData = data.getJSONObject("resData")
+                    val extInfo = resData.getJSONObject("extInfo")
+                    extInfo.getJSONObject("zhimaTreeAccountEnergyQueryResult")
+                } else if (jsonResponse.has("zhimaTreeAccountEnergyQueryResult")) {
+                    jsonResponse.getJSONObject("zhimaTreeAccountEnergyQueryResult")
+                } else {
+                    // 尝试其他可能的字段结构
+                    jsonResponse.optJSONObject("result") ?: jsonResponse
+                }
                 
                 val accountEnergy = energyResult.optString("accountEnergy", "0")
                 Log.record(TAG, "当前芝麻树能量: ${accountEnergy}g")
                 
             } else {
                 Log.runtime(TAG, "查询能量状态失败: ${jsonResponse.optString("resultDesc", "未知错误")}")
+                // 打印响应内容用于调试
+                Log.record(TAG, "能量查询响应: $response")
             }
         } catch (e: JSONException) {
             Log.printStackTrace(TAG, e)
+            // 打印响应内容用于调试
+            try {
+                val response = AntGroupRpcCall.queryForestEnergy(fixedPlayInfo)
+                Log.record(TAG, "能量查询原始响应: $response")
+            } catch (ex: Exception) {
+                Log.record(TAG, "无法获取能量查询原始响应")
+            }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, t)
         }
@@ -167,10 +184,18 @@ class AntGroup : ModelTask() {
             val jsonResponse = JSONObject(response)
 
             if (ResChecker.checkRes(TAG, jsonResponse)) {
-                val data = jsonResponse.getJSONObject("Data")
-                val resData = data.getJSONObject("resData")
-                val extInfo = resData.getJSONObject("extInfo")
-                val homePageResult = extInfo.getJSONObject("zhimaTreeHomePageQueryResult")
+                // 根据实际返回结构解析，可能没有Data字段
+                val homePageResult = if (jsonResponse.has("Data")) {
+                    val data = jsonResponse.getJSONObject("Data")
+                    val resData = data.getJSONObject("resData")
+                    val extInfo = resData.getJSONObject("extInfo")
+                    extInfo.getJSONObject("zhimaTreeHomePageQueryResult")
+                } else if (jsonResponse.has("zhimaTreeHomePageQueryResult")) {
+                    jsonResponse.getJSONObject("zhimaTreeHomePageQueryResult")
+                } else {
+                    // 尝试其他可能的字段结构
+                    jsonResponse.optJSONObject("result") ?: jsonResponse
+                }
 
                 // 获取当前能量值
                 val accountEnergy = homePageResult.optString("accountEnergy", "0")
@@ -203,9 +228,18 @@ class AntGroup : ModelTask() {
                 Log.record(TAG, "首页查询成功，找到${taskList.size}个浏览任务")
             } else {
                 Log.runtime(TAG, "查询首页失败: ${jsonResponse.optString("resultDesc", "未知错误")}")
+                // 打印响应内容用于调试
+                Log.record(TAG, "首页查询响应: $response")
             }
         } catch (e: JSONException) {
             Log.printStackTrace(TAG, e)
+            // 打印响应内容用于调试
+            try {
+                val response = AntGroupRpcCall.queryHomePage(fixedPlayInfo)
+                Log.record(TAG, "首页查询原始响应: $response")
+            } catch (ex: Exception) {
+                Log.record(TAG, "无法获取首页查询原始响应")
+            }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, t)
         }
