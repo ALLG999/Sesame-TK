@@ -11,14 +11,12 @@ import fansirsqi.xposed.sesame.model.modelFieldExt.ChoiceModelField
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField
 import fansirsqi.xposed.sesame.task.ModelTask
 import fansirsqi.xposed.sesame.task.TaskCommon
-import fansirsqi.xposed.sesame.util.GlobalThreadPools
+import fansirsqi.xposed.sesame.util.CoroutineUtils
 import fansirsqi.xposed.sesame.util.Log
-import fansirsqi.xposed.sesame.util.ResChecker
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 芝麻树任务（仅浏览类任务）
@@ -32,12 +30,6 @@ class AntGroup : ModelTask() {
     private var autoReceiveReward: BooleanModelField? = null
     private var taskFilterType: ChoiceModelField? = null
     private var excludedTaskList: SelectModelField? = null
-
-    // 任务重试计数
-    private val taskTryCount = ConcurrentHashMap<String, AtomicInteger>()
-
-    // 固定的playInfo，从抓包中获取
-    private val fixedPlayInfo = "SwbtxJSo8OOUrymAU%2FHnY2jyFRc%2BkCJ3"
 
     override fun getName(): String {
         return "芝麻树"
@@ -113,11 +105,6 @@ class AntGroup : ModelTask() {
                 Log.record(TAG, "未找到可执行的首页浏览任务")
             }
 
-            // 自动领取奖励
-            if (autoReceiveReward!!.value == true) {
-                autoReceiveRewards(homePageTasks)
-            }
-
             // 查询最终能量状态
             queryEnergyStatus()
 
@@ -134,42 +121,49 @@ class AntGroup : ModelTask() {
      */
     private fun queryEnergyStatus() {
         try {
-            val response = AntGroupRpcCall.queryForestEnergy(fixedPlayInfo)
+            val response = AntGroupRpcCall.queryForestEnergy()
             val jsonResponse = JSONObject(response)
 
             if (ResChecker.checkRes(TAG, jsonResponse)) {
-                // 根据实际返回结构解析，可能没有Data字段
-                val energyResult = if (jsonResponse.has("Data")) {
-                    val data = jsonResponse.getJSONObject("Data")
-                    val resData = data.getJSONObject("resData")
-                    val extInfo = resData.getJSONObject("extInfo")
-                    extInfo.getJSONObject("zhimaTreeAccountEnergyQueryResult")
-                } else if (jsonResponse.has("zhimaTreeAccountEnergyQueryResult")) {
-                    jsonResponse.getJSONObject("zhimaTreeAccountEnergyQueryResult")
-                } else {
-                    // 尝试其他可能的字段结构
-                    jsonResponse.optJSONObject("result") ?: jsonResponse
-                }
-                
+                val energyResult = parseEnergyResponse(jsonResponse)
                 val accountEnergy = energyResult.optString("accountEnergy", "0")
                 Log.record(TAG, "当前芝麻树能量: ${accountEnergy}g")
                 
             } else {
-                Log.runtime(TAG, "查询能量状态失败: ${jsonResponse.optString("resultDesc", "未知错误")}")
-                // 打印响应内容用于调试
-                Log.record(TAG, "能量查询响应: $response")
+                Log.runtime(TAG, "查询能量状态失败: ${ResChecker.getErrorMsg(jsonResponse)}")
             }
         } catch (e: JSONException) {
-            Log.printStackTrace(TAG, e)
-            // 打印响应内容用于调试
-            try {
-                val response = AntGroupRpcCall.queryForestEnergy(fixedPlayInfo)
-                Log.record(TAG, "能量查询原始响应: $response")
-            } catch (ex: Exception) {
-                Log.record(TAG, "无法获取能量查询原始响应")
-            }
+            Log.printStackTrace(TAG, "能量查询JSON解析异常", e)
         } catch (t: Throwable) {
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "能量查询异常", t)
+        }
+    }
+
+    /**
+     * 解析能量响应数据
+     */
+    private fun parseEnergyResponse(jsonResponse: JSONObject): JSONObject {
+        return try {
+            when {
+                jsonResponse.has("Data") -> {
+                    jsonResponse.getJSONObject("Data")
+                        .getJSONObject("resData")
+                        .getJSONObject("extInfo")
+                        .getJSONObject("zhimaTreeAccountEnergyQueryResult")
+                }
+                jsonResponse.has("resData") -> {
+                    jsonResponse.getJSONObject("resData")
+                        .getJSONObject("extInfo")  
+                        .getJSONObject("zhimaTreeAccountEnergyQueryResult")
+                }
+                jsonResponse.has("zhimaTreeAccountEnergyQueryResult") -> {
+                    jsonResponse.getJSONObject("zhimaTreeAccountEnergyQueryResult")
+                }
+                else -> jsonResponse
+            }
+        } catch (e: Exception) {
+            Log.printStackTrace(TAG, "解析能量响应异常", e)
+            JSONObject().put("accountEnergy", "0")
         }
     }
 
@@ -180,22 +174,11 @@ class AntGroup : ModelTask() {
         val taskList = mutableListOf<TaskDetail>()
         
         try {
-            val response = AntGroupRpcCall.queryHomePage(fixedPlayInfo)
+            val response = AntGroupRpcCall.queryHomePage()
             val jsonResponse = JSONObject(response)
 
             if (ResChecker.checkRes(TAG, jsonResponse)) {
-                // 根据实际返回结构解析，可能没有Data字段
-                val homePageResult = if (jsonResponse.has("Data")) {
-                    val data = jsonResponse.getJSONObject("Data")
-                    val resData = data.getJSONObject("resData")
-                    val extInfo = resData.getJSONObject("extInfo")
-                    extInfo.getJSONObject("zhimaTreeHomePageQueryResult")
-                } else if (jsonResponse.has("zhimaTreeHomePageQueryResult")) {
-                    jsonResponse.getJSONObject("zhimaTreeHomePageQueryResult")
-                } else {
-                    // 尝试其他可能的字段结构
-                    jsonResponse.optJSONObject("result") ?: jsonResponse
-                }
+                val homePageResult = parseHomePageResponse(jsonResponse)
 
                 // 获取当前能量值
                 val accountEnergy = homePageResult.optString("accountEnergy", "0")
@@ -209,42 +192,73 @@ class AntGroup : ModelTask() {
                         val taskDetail = parseHomeBrowseTask(task)
                         if (isTaskValid(taskDetail)) {
                             taskList.add(taskDetail)
+                            Log.record(TAG, "找到任务: ${taskDetail.title} - ${taskDetail.finishOneTaskGetPurificationValue}净化值")
                         }
                     }
                 }
 
                 // 获取树木状态信息
-                if (homePageResult.has("trees")) {
-                    val trees = homePageResult.getJSONArray("trees")
-                    if (trees.length() > 0) {
-                        val tree = trees.getJSONObject(0)
-                        val scoreSummary = tree.optInt("scoreSummary", 0)
-                        val currentLevelProcessState = tree.optInt("currentLevelProcessState", 0)
-                        val treeLevel = tree.optInt("treeLevel", 1)
-                        Log.record(TAG, "芝麻树状态: 等级${treeLevel}, 净化值${scoreSummary}, 进度${currentLevelProcessState}%")
-                    }
-                }
+                parseTreeStatus(homePageResult)
 
                 Log.record(TAG, "首页查询成功，找到${taskList.size}个浏览任务")
             } else {
-                Log.runtime(TAG, "查询首页失败: ${jsonResponse.optString("resultDesc", "未知错误")}")
-                // 打印响应内容用于调试
-                Log.record(TAG, "首页查询响应: $response")
+                Log.runtime(TAG, "查询首页失败: ${ResChecker.getErrorMsg(jsonResponse)}")
             }
         } catch (e: JSONException) {
-            Log.printStackTrace(TAG, e)
-            // 打印响应内容用于调试
-            try {
-                val response = AntGroupRpcCall.queryHomePage(fixedPlayInfo)
-                Log.record(TAG, "首页查询原始响应: $response")
-            } catch (ex: Exception) {
-                Log.record(TAG, "无法获取首页查询原始响应")
-            }
+            Log.printStackTrace(TAG, "首页查询JSON解析异常", e)
         } catch (t: Throwable) {
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "首页查询异常", t)
         }
         
         return taskList
+    }
+
+    /**
+     * 解析首页响应数据
+     */
+    private fun parseHomePageResponse(jsonResponse: JSONObject): JSONObject {
+        return try {
+            when {
+                jsonResponse.has("Data") -> {
+                    jsonResponse.getJSONObject("Data")
+                        .getJSONObject("resData")
+                        .getJSONObject("extInfo")
+                        .getJSONObject("zhimaTreeHomePageQueryResult")
+                }
+                jsonResponse.has("resData") -> {
+                    jsonResponse.getJSONObject("resData")
+                        .getJSONObject("extInfo")
+                        .getJSONObject("zhimaTreeHomePageQueryResult")
+                }
+                jsonResponse.has("zhimaTreeHomePageQueryResult") -> {
+                    jsonResponse.getJSONObject("zhimaTreeHomePageQueryResult")
+                }
+                else -> jsonResponse
+            }
+        } catch (e: Exception) {
+            Log.printStackTrace(TAG, "解析首页响应异常", e)
+            JSONObject()
+        }
+    }
+
+    /**
+     * 解析树木状态
+     */
+    private fun parseTreeStatus(homePageResult: JSONObject) {
+        try {
+            if (homePageResult.has("trees")) {
+                val trees = homePageResult.getJSONArray("trees")
+                if (trees.length() > 0) {
+                    val tree = trees.getJSONObject(0)
+                    val scoreSummary = tree.optInt("scoreSummary", 0)
+                    val currentLevelProcessState = tree.optInt("currentLevelProcessState", 0)
+                    val treeLevel = tree.optInt("treeLevel", 1)
+                    Log.record(TAG, "芝麻树状态: 等级${treeLevel}, 净化值${scoreSummary}, 进度${currentLevelProcessState}%")
+                }
+            }
+        } catch (e: Exception) {
+            Log.printStackTrace(TAG, "解析树木状态异常", e)
+        }
     }
 
     /**
@@ -306,11 +320,11 @@ class AntGroup : ModelTask() {
                     amountUnitText = displayInfo?.optString("amountUnitText", "") ?: "",
                     formType = displayInfo?.optString("formType", "") ?: "",
                     prizeFrequency = "",
-                    energyValue = 0 // 首页任务奖励主要是净化值，不是能量
+                    energyValue = 0
                 ))
             }
         } catch (e: Exception) {
-            Log.printStackTrace(TAG, e)
+            Log.printStackTrace(TAG, "解析奖励详情异常", e)
         }
         return prizeDetails
     }
@@ -331,9 +345,9 @@ class AntGroup : ModelTask() {
 
         // 根据过滤类型检查
         return when (taskFilterType!!.value) {
-            1 -> task.finishOneTaskGetPurificationValue == 50 // 仅50净化值任务
-            2 -> task.finishOneTaskGetPurificationValue >= 100 // 仅高奖励任务
-            else -> true // 全部任务
+            1 -> task.finishOneTaskGetPurificationValue == 50
+            2 -> task.finishOneTaskGetPurificationValue >= 100
+            else -> true
         }
     }
 
@@ -341,47 +355,69 @@ class AntGroup : ModelTask() {
      * 处理浏览任务
      */
     private fun processBrowseTasks(tasks: List<TaskDetail>) {
-        for (task in tasks) {
+        val successfulTasks = mutableListOf<String>()
+        val failedTasks = mutableListOf<String>()
+        
+        tasks.forEachIndexed { index, task ->
             try {
-                if (task.canAccess && task.taskProcessStatus == "NOT_DONE") {
-                    // 执行浏览任务
-                    executeBrowseTask(task)
+                Log.record(TAG, "处理任务[${index + 1}/${tasks.size}]: ${task.title}")
+                
+                if (executeBrowseTask(task)) {
+                    successfulTasks.add(task.title)
+                    Log.record(TAG, "任务[${task.title}]执行成功")
+                } else {
+                    failedTasks.add(task.title)
+                    Log.runtime(TAG, "任务[${task.title}]执行失败")
                 }
-
-                GlobalThreadPools.sleepCompat(1000)
+                
+                // 任务间间隔
+                if (index < tasks.size - 1) {
+                    CoroutineUtils.sleepCompat(1500)
+                }
             } catch (t: Throwable) {
-                Log.printStackTrace(TAG, t)
+                Log.printStackTrace(TAG, "处理任务异常", t)
+                failedTasks.add(task.title)
             }
+        }
+        
+        // 汇总结果
+        if (successfulTasks.isNotEmpty()) {
+            Log.forest("芝麻树🌳成功完成${successfulTasks.size}个任务")
+        }
+        if (failedTasks.isNotEmpty()) {
+            Log.runtime(TAG, "芝麻树失败任务: ${failedTasks.joinToString()}")
         }
     }
 
     /**
-     * 执行浏览任务
+     * 执行浏览任务 - 返回是否成功
      */
-    private fun executeBrowseTask(task: TaskDetail) {
-        try {
-            Log.record(TAG, "开始执行浏览任务: ${task.title}")
+    private fun executeBrowseTask(task: TaskDetail): Boolean {
+        return try {
+            Log.record(TAG, "开始执行浏览任务: ${task.title} (ID: ${task.taskId})")
 
-            // 根据抓包，浏览任务完成后需要调用任务完成接口
             val finishResponse = AntGroupRpcCall.finishTask(taskId = task.taskId)
             val finishJson = JSONObject(finishResponse)
 
             if (ResChecker.checkRes(TAG, finishJson)) {
-                Log.forest("芝麻树🌳[完成浏览:${task.title}]获得${task.finishOneTaskGetPurificationValue}净化值")
-                Toast.show("芝麻树完成: ${task.title}")
-
-                // 模拟浏览时间（从任务配置中获取）
+                // 模拟浏览时间
                 val browseTime = task.browseTime?.toIntOrNull() ?: 15
                 Log.record(TAG, "模拟浏览${browseTime}秒...")
-                GlobalThreadPools.sleepCompat(browseTime * 1000L)
+                CoroutineUtils.sleepCompat(browseTime * 1000L)
 
+                Log.forest("芝麻树🌳[完成浏览:${task.title}]获得${task.finishOneTaskGetPurificationValue}净化值")
+                Toast.show("芝麻树完成: ${task.title}")
+                
                 // 任务完成后短暂等待
-                GlobalThreadPools.sleepCompat(2000)
+                CoroutineUtils.sleepCompat(2000)
+                true
             } else {
-                Log.runtime(TAG, "执行浏览任务[${task.title}]失败: ${finishJson.optString("resultDesc", "未知错误")}")
+                Log.runtime(TAG, "执行浏览任务[${task.title}]失败: ${ResChecker.getErrorMsg(finishJson)}")
+                false
             }
         } catch (t: Throwable) {
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "执行浏览任务异常", t)
+            false
         }
     }
 
@@ -389,14 +425,11 @@ class AntGroup : ModelTask() {
      * 自动领取奖励
      */
     private fun autoReceiveRewards(tasks: List<TaskDetail>) {
-        // 根据抓包数据，浏览任务完成后奖励是自动发放的，不需要单独领取
-        // 这里主要处理其他可能需要手动领取的任务类型
         var rewardCount = 0
         
         for (task in tasks) {
             try {
                 if (task.taskProcessStatus == "RECEIVE_SUCCESS" && task.needManuallyReceiveAward) {
-                    // 对于需要手动领取的任务，调用领取接口
                     val mainPrize = task.prizeDetails.firstOrNull()
                     if (mainPrize != null && task.taskOrderId != null) {
                         val rewardResponse = AntGroupRpcCall.receiveTaskReward(
@@ -412,49 +445,16 @@ class AntGroup : ModelTask() {
                             Toast.show("芝麻树领取: ${task.title}")
                         }
                     }
-
-                    GlobalThreadPools.sleepCompat(800)
+                    CoroutineUtils.sleepCompat(800)
                 }
             } catch (t: Throwable) {
-                Log.printStackTrace(TAG, t)
+                Log.printStackTrace(TAG, "领取奖励异常", t)
             }
         }
         
         if (rewardCount > 0) {
             Log.record(TAG, "成功领取${rewardCount}个任务奖励")
         }
-    }
-
-    /**
-     * 解析奖励详情（通用方法）
-     */
-    private fun parsePrizeDetails(taskData: JSONObject): List<PrizeDetail> {
-        val prizeDetails = mutableListOf<PrizeDetail>()
-        try {
-            val prizeArray = taskData.optJSONArray("validPrizeDetailDTO") ?: return prizeDetails
-
-            for (i in 0 until prizeArray.length()) {
-                val prize = prizeArray.getJSONObject(i)
-                val baseInfo = prize.getJSONObject("prizeBaseInfoDTO")
-                val displayInfo = prize.optJSONObject("prizeCustomDisplayInfoDTO")
-
-                prizeDetails.add(PrizeDetail(
-                    prizeId = prize.optString("prizeId", ""),
-                    prizeName = baseInfo.optString("prizeName", ""),
-                    prizeStatus = baseInfo.optString("prizeStatus", ""),
-                    budgetStatus = baseInfo.optString("budgetStatus", ""),
-                    budgetAmount = baseInfo.optLong("budgetAmount", 0),
-                    budgetType = baseInfo.optString("budgetType", ""),
-                    amountUnitText = displayInfo?.optString("amountUnitText", "") ?: "",
-                    formType = displayInfo?.optString("formType", "") ?: "",
-                    prizeFrequency = displayInfo?.optJSONObject("extInfo")?.optString("PRIZE_FREQUENCY", "") ?: "",
-                    energyValue = prize.optInt("energyValue", 0)
-                ))
-            }
-        } catch (e: Exception) {
-            Log.printStackTrace(TAG, e)
-        }
-        return prizeDetails
     }
 
     /**
