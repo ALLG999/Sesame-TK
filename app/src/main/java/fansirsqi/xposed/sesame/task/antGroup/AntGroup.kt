@@ -99,9 +99,6 @@ class AntGroup : ModelTask() {
                 return
             }
 
-            // 初始化RPC版本
-            AntGroupRpcCall.init()
-
             // 查询当前能量状态
             queryEnergyStatus()
 
