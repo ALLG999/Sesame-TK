@@ -14,7 +14,6 @@ import fansirsqi.xposed.sesame.task.TaskCommon
 import fansirsqi.xposed.sesame.util.CoroutineUtils
 import fansirsqi.xposed.sesame.util.Log
 import org.json.JSONArray
-import org.json.JSONException
 import org.json.JSONObject
 import java.util.*
 
@@ -73,12 +72,13 @@ class AntGroup : ModelTask() {
         try {
             Log.record(TAG, "执行开始-${getName()}")
 
-            if (dailyTask?.value != true) {
+            if (!checkFieldEnabled(dailyTask)) {
                 Log.record(TAG, "芝麻树任务未开启，跳过执行")
                 return
             }
 
             queryEnergyStatus()
+
             val homePageTasks = processHomePageTasks()
 
             if (homePageTasks.isNotEmpty()) {
@@ -88,7 +88,7 @@ class AntGroup : ModelTask() {
                 Log.record(TAG, "未找到可执行的首页浏览任务")
             }
 
-            if (autoReceiveReward?.value == true) {
+            if (checkFieldEnabled(autoReceiveReward)) {
                 autoReceiveRewards(homePageTasks)
             }
 
@@ -102,22 +102,35 @@ class AntGroup : ModelTask() {
         }
     }
 
+    // 检查配置字段是否启用
+    private fun checkFieldEnabled(field: BooleanModelField?): Boolean {
+        return field?.value == true
+    }
+
+    // 通用RPC请求
+    private fun sendRpcRequest(apiName: String, payload: JSONObject): JSONObject? {
+        val response = RpcEntity.sendRequest(RpcEntity(requestMethod = "POST", requestData = payload.toString(), methodName = apiName))
+        val jsonResponse = JSONObject(response)
+        return if (ResChecker.checkRes(TAG, jsonResponse)) jsonResponse else null
+    }
+
     private fun queryEnergyStatus() {
         try {
-            val response = AntGroupRpcCall.queryForestEnergy()
-            val jsonResponse = JSONObject(response)
+            val payload = JSONObject().apply {
+                put("aseChannelId", "RENT")
+            }
+            val response = sendRpcRequest("com.alipay.creditapollon.venue.energy.query", payload)
 
-            if (ResChecker.checkRes(TAG, jsonResponse)) {
-                val energyResult = jsonResponse
+            response?.let {
+                val energyResult = it
                     .getJSONObject("Data")
                     .getJSONObject("resData")
                     .getJSONObject("extInfo")
                     .getJSONObject("zhimaTreeAccountEnergyQueryResult")
                 val accountEnergy = energyResult.optString("accountEnergy", "0")
                 Log.record(TAG, "当前芝麻树能量: ${accountEnergy}g")
-            } else {
-                Log.runtime(TAG, "查询能量状态失败: ${ResChecker.getErrorMsg(jsonResponse)}")
             }
+
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "能量查询异常", t)
         }
@@ -149,10 +162,13 @@ class AntGroup : ModelTask() {
     private fun executeBrowseTask(task: TaskDetail): Boolean {
         return try {
             Log.record(TAG, "开始执行浏览任务: ${task.title} (ID: ${task.taskId})")
-            val finishResponse = AntGroupRpcCall.finishTask(task.taskId)
-            val finishJson = JSONObject(finishResponse)
+            val finishResponse = sendRpcRequest("com.alipay.creditapollon.venue.task.report", JSONObject().apply {
+                put("taskId", task.taskId)
+                put("taskType", "BROWSE_15S")
+                put("status", "FINISH")
+            })
 
-            if (ResChecker.checkRes(TAG, finishJson)) {
+            finishResponse?.let {
                 val browseTime = task.browseTime?.toIntOrNull() ?: 15
                 Log.record(TAG, "模拟浏览${browseTime}秒...")
                 CoroutineUtils.sleepCompat(browseTime * 1000L)
@@ -160,10 +176,8 @@ class AntGroup : ModelTask() {
                 Toast.show("芝麻树完成: ${task.title}")
                 CoroutineUtils.sleepCompat(2000)
                 true
-            } else {
-                Log.runtime(TAG, "执行浏览任务[${task.title}]失败: ${ResChecker.getErrorMsg(finishJson)}")
-                false
-            }
+            } ?: false
+
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "执行浏览任务异常", t)
             false
@@ -172,14 +186,17 @@ class AntGroup : ModelTask() {
 
     private fun autoReceiveRewards(tasks: List<TaskDetail>) {
         var rewardCount = 0
-        for (task in tasks) {
+        tasks.forEach { task ->
             try {
                 if (task.hasRewardToReceive) {
                     val mainPrize = task.prizeDetails.firstOrNull()
                     if (mainPrize != null && task.taskOrderId != null) {
-                        val rewardResponse = AntGroupRpcCall.receiveTaskReward(task.taskOrderId, task.taskId, mainPrize.prizeId)
-                        val rewardJson = JSONObject(rewardResponse)
-                        if (ResChecker.checkRes(TAG, rewardJson)) {
+                        val rewardResponse = sendRpcRequest("com.alipay.creditapollon.venue.task.report", JSONObject().apply {
+                            put("taskOrderId", task.taskOrderId)
+                            put("taskId", task.taskId)
+                            put("prizeId", mainPrize.prizeId)
+                        })
+                        rewardResponse?.let {
                             rewardCount++
                             Log.forest("芝麻树🌳[领取奖励:${task.title}]#${task.finishOneTaskGetPurificationValue}净化值")
                             Toast.show("芝麻树领取: ${task.title}")
@@ -197,10 +214,13 @@ class AntGroup : ModelTask() {
     private fun processHomePageTasks(): List<TaskDetail> {
         val taskList = mutableListOf<TaskDetail>()
         try {
-            val response = AntGroupRpcCall.queryHomePage()
-            val jsonResponse = JSONObject(response)
-            if (ResChecker.checkRes(TAG, jsonResponse)) {
-                val homePageResult = jsonResponse.getJSONObject("Data")
+            val response = sendRpcRequest("com.alipay.creditapollon.venue.page.layout.query", JSONObject().apply {
+                put("aseChannelId", "RENT")
+                put("venuePageId", "HOME_PAGE")
+            })
+
+            response?.let {
+                val homePageResult = it.getJSONObject("Data")
                     .getJSONObject("resData")
                     .getJSONObject("extInfo")
                     .getJSONObject("zhimaTreeHomePageQueryResult")
@@ -213,10 +233,7 @@ class AntGroup : ModelTask() {
                         if (isTaskValid(taskDetail)) taskList.add(taskDetail)
                     }
                 }
-
                 parseTreeStatus(homePageResult)
-            } else {
-                Log.runtime(TAG, "查询首页失败: ${ResChecker.getErrorMsg(jsonResponse)}")
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "首页查询异常", t)
