@@ -1,23 +1,17 @@
 package fansirsqi.xposed.sesame.rpc
 
-import fansirsqi.xposed.sesame.util.HttpUtil
+import fansirsqi.xposed.sesame.entity.RpcEntity
+import fansirsqi.xposed.sesame.util.CoroutineUtils
+import fansirsqi.xposed.sesame.util.Log
 import org.json.JSONObject
 
 /**
  * 芝麻树（Apollon版）RPC 调用封装
  * 所有方法均返回原始 JSON 字符串，由上层模块自行解析。
- *
- * 已适配：
- * 1. com.alipay.creditapollon.venue.page.layout.query
- * 2. com.alipay.creditapollon.venue.energy.query
- * 3. com.alipay.creditapollon.venue.energy.finish
- * 4. com.alipay.creditapollon.venue.task.query
- * 5. com.alipay.creditapollon.venue.task.report
- *
- * 舍弃旧的 zmtask / promoprod 接口。
  */
 object AntGroupRpcCall {
 
+    private const val ASE_CHANNEL_ID = "RENT" // 常用的渠道ID
     private const val PAGE_LAYOUT_QUERY = "com.alipay.creditapollon.venue.page.layout.query"
     private const val ENERGY_QUERY = "com.alipay.creditapollon.venue.energy.query"
     private const val ENERGY_FINISH = "com.alipay.creditapollon.venue.energy.finish"
@@ -25,24 +19,51 @@ object AntGroupRpcCall {
     private const val TASK_REPORT = "com.alipay.creditapollon.venue.task.report"
 
     /**
+     * 构建公共的请求 payload
+     */
+    private fun buildPayload(vararg params: Pair<String, Any>): JSONObject {
+        return JSONObject().apply {
+            put("aseChannelId", ASE_CHANNEL_ID)
+            params.forEach { (key, value) ->
+                put(key, value)
+            }
+        }
+    }
+
+    /**
+     * 发送 RPC 请求并记录日志
+     */
+    private fun sendRequest(apiName: String, payload: JSONObject): String? {
+        val rpcEntity = RpcEntity(requestMethod = "POST", requestData = payload.toString(), methodName = apiName)
+
+        CoroutineUtils.runOnIO {
+            try {
+                Log.debug("Sending request to $apiName with payload: ${payload.toString()}")
+                // 通过 RpcEntity 发送请求
+                val response = RpcEntity.sendRequest(rpcEntity)
+                Log.debug("Received response from $apiName: $response")
+            } catch (e: Exception) {
+                Log.printStackTrace("Error while sending request to $apiName", e)
+            }
+        }
+
+        return rpcEntity.responseString // 返回原始 JSON 字符串
+    }
+
+    /**
      * 获取首页布局信息（入口模块）
      */
     fun pageLayoutQuery(): String? {
-        val payload = JSONObject().apply {
-            put("aseChannelId", "RENT")
-            put("venuePageId", "HOME_PAGE")
-        }
-        return HttpUtil.post(PAGE_LAYOUT_QUERY, payload.toString())
+        val payload = buildPayload("venuePageId" to "HOME_PAGE")
+        return sendRequest(PAGE_LAYOUT_QUERY, payload)
     }
 
     /**
      * 查询能量（获取当前净化值节点、剩余可收取能量等）
      */
     fun energyQuery(): String? {
-        val payload = JSONObject().apply {
-            put("aseChannelId", "RENT")
-        }
-        return HttpUtil.post(ENERGY_QUERY, payload.toString())
+        val payload = buildPayload() // 无额外参数
+        return sendRequest(ENERGY_QUERY, payload)
     }
 
     /**
@@ -50,21 +71,16 @@ object AntGroupRpcCall {
      * @param contentId 能量节点 ID
      */
     fun energyFinish(contentId: String): String? {
-        val payload = JSONObject().apply {
-            put("aseChannelId", "RENT")
-            put("contentId", contentId)
-        }
-        return HttpUtil.post(ENERGY_FINISH, payload.toString())
+        val payload = buildPayload("contentId" to contentId)
+        return sendRequest(ENERGY_FINISH, payload)
     }
 
     /**
      * 查询任务列表（包含每日任务、浏览任务等）
      */
     fun taskQuery(): String? {
-        val payload = JSONObject().apply {
-            put("aseChannelId", "RENT")
-        }
-        return HttpUtil.post(TASK_QUERY, payload.toString())
+        val payload = buildPayload() // 无额外参数
+        return sendRequest(TASK_QUERY, payload)
     }
 
     /**
@@ -80,11 +96,7 @@ object AntGroupRpcCall {
             put("status", status)
         }
 
-        val payload = JSONObject().apply {
-            put("aseChannelId", "RENT")
-            put("extInfo", extInfo)
-        }
-
-        return HttpUtil.post(TASK_REPORT, payload.toString())
+        val payload = buildPayload("extInfo" to extInfo)
+        return sendRequest(TASK_REPORT, payload)
     }
 }
